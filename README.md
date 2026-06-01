@@ -10,14 +10,6 @@ with the keyboard; inactive tabs keep running and buffering output.
 curtab 'npm run dev' 'npm run api'
 ```
 
-```
- ● 1:npm run dev   ✓ 2:npm run api
-┌────────────────────────────────────────┐
-│  active tab's live output (in color)    │
-└────────────────────────────────────────┘
- Alt+1-9 tab  Alt+R restart  Alt+K kill  Wheel scroll  Ctrl+C quit
-```
-
 ## Install
 
 ```bash
