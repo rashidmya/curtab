@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   parseCommands,
+  parseArgs,
   buildShellInvocation,
   statusIcon,
   tabLabel,
   classifyInput,
-  wantsVersion,
+  SHORT_USAGE,
   USAGE,
 } from "./commands";
 
@@ -40,29 +41,74 @@ describe("parseCommands", () => {
 });
 
 describe("USAGE", () => {
-  it("is shown when no commands are provided and mentions the binary name", () => {
-    expect(parseCommands([])).toHaveLength(0);
+  it("mentions the binary name and full options", () => {
     expect(USAGE).toContain("curtab");
     expect(USAGE.toLowerCase()).toContain("usage");
+    expect(USAGE).toContain("--names");
   });
 });
 
-describe("wantsVersion", () => {
-  it("is true when --version is present", () => {
-    expect(wantsVersion(["--version"])).toBe(true);
+describe("SHORT_USAGE", () => {
+  it("is a terse two-line message pointing at --help", () => {
+    expect(parseCommands([])).toHaveLength(0);
+    expect(SHORT_USAGE).toContain("Usage: curtab");
+    expect(SHORT_USAGE).toContain("Try 'curtab --help'");
+    // Stays short — full option list lives in USAGE / --help.
+    expect(SHORT_USAGE.split("\n")).toHaveLength(2);
+  });
+});
+
+describe("parseArgs", () => {
+  it("treats bare positional arguments as commands", () => {
+    const result = parseArgs(["npm run dev", "npm run api"]);
+    expect(result.commands).toEqual(["npm run dev", "npm run api"]);
+    expect(result.names).toEqual([]);
+    expect(result.help).toBe(false);
+    expect(result.version).toBe(false);
   });
 
-  it("is true for the -v short flag", () => {
-    expect(wantsVersion(["-v"])).toBe(true);
+  it("sets version for --version and -v", () => {
+    expect(parseArgs(["--version"]).version).toBe(true);
+    expect(parseArgs(["-v"]).version).toBe(true);
   });
 
-  it("is true even when mixed with other arguments", () => {
-    expect(wantsVersion(["npm run dev", "--version"])).toBe(true);
+  it("sets help for --help and -h", () => {
+    expect(parseArgs(["--help"]).help).toBe(true);
+    expect(parseArgs(["-h"]).help).toBe(true);
   });
 
-  it("is false when no version flag is given", () => {
-    expect(wantsVersion(["npm run dev", "npm run api"])).toBe(false);
-    expect(wantsVersion([])).toBe(false);
+  it("parses --names as a comma-separated, trimmed list", () => {
+    const result = parseArgs(["--names", "web, api ,worker", "a", "b", "c"]);
+    expect(result.names).toEqual(["web", "api", "worker"]);
+    expect(result.commands).toEqual(["a", "b", "c"]);
+  });
+
+  it("accepts the -n short flag and the --names=value form", () => {
+    expect(parseArgs(["-n", "web, api", "a", "b"]).names).toEqual([
+      "web",
+      "api",
+    ]);
+    expect(parseArgs(["--names=web, api", "a", "b"]).names).toEqual([
+      "web",
+      "api",
+    ]);
+  });
+
+  it("does not leak the names flag or its value into commands", () => {
+    const result = parseArgs(["npm run dev", "-n", "dev,api", "npm run api"]);
+    expect(result.commands).toEqual(["npm run dev", "npm run api"]);
+    expect(result.names).toEqual(["dev", "api"]);
+  });
+
+  it("treats a trailing names flag with no value as no names", () => {
+    expect(parseArgs(["a", "--names"]).names).toEqual([]);
+  });
+
+  it("ignores empty / whitespace-only command arguments", () => {
+    expect(parseArgs(["echo a", "", "  ", "echo b"]).commands).toEqual([
+      "echo a",
+      "echo b",
+    ]);
   });
 });
 

@@ -48,6 +48,22 @@ curtab 'npm run dev' 'npm run api'
 > { "scripts": { "dev": "curtab \"npm run web\" \"npm run api\"" } }
 > ```
 
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `-n`, `--names "a, b"` | Custom tab names (comma-separated), matched to commands in order. Missing names fall back to the command text. |
+| `-h`, `--help` | Show usage and exit. |
+| `-v`, `--version` | Print the curtab version and exit. |
+
+By default each tab is labelled with its command. Give friendlier names with
+`-n` / `--names` — the names map to commands left-to-right:
+
+```bash
+curtab -n 'web, api' 'npm run dev' 'npm run api'
+#  ● 1:web   ● 2:api
+```
+
 ## Keyboard controls
 
 | Key | Action |

@@ -8,25 +8,34 @@
 
 export type TabStatus = "running" | "exited" | "killed";
 
+/** Terse message shown when curtab is run with no commands (cf. grep, ls). */
+export const SHORT_USAGE = `Usage: curtab [options] '<command 1>' '<command 2>' [...]
+Try 'curtab --help' for more information.`;
+
 export const USAGE = `curtab — run each command in its own interactive terminal tab.
 
 Usage:
-  curtab '<command 1>' '<command 2>' [...]
+  curtab [options] '<command 1>' '<command 2>' [...]
 
 Each positional argument is ONE full command and is run through your shell.
 Commands containing spaces must be quoted (use double quotes on Windows).
 
+Options:
+  -n, --names "a, b"   Custom tab names (comma-separated), matched to commands
+                       in order. Missing names fall back to the command text.
+  -h, --help           Show this help and exit.
+  -v, --version        Print the curtab version and exit.
+
 Examples:
   curtab 'npm run dev' 'npm run api'
-  curtab "npm run dev" "npm run api"   # Windows
+  curtab "npm run dev" "npm run api"            # Windows
+  curtab -n 'web, api' 'npm run dev' 'npm run api'
 
 Keyboard controls:
   Alt+1..9    switch to tab by index
   Alt+R       restart the active process
   Alt+K       kill the active process
   Ctrl+C      quit curtab and kill all processes
-
-(Terminals cannot transmit Ctrl+<digit>, so curtab uses Alt+<digit>.)
 `;
 
 /**
@@ -39,9 +48,57 @@ export function parseCommands(argv: string[]): string[] {
   return argv.map((arg) => arg.trim()).filter((arg) => arg.length > 0);
 }
 
-/** True when argv requests the version, e.g. `curtab --version` or `curtab -v`. */
-export function wantsVersion(argv: string[]): boolean {
-  return argv.some((arg) => arg === "--version" || arg === "-v");
+/** Split a `--names` value ("web, api") into trimmed names; "" yields []. */
+function parseNames(value: string): string[] {
+  if (value.trim().length === 0) return [];
+  return value.split(",").map((name) => name.trim());
+}
+
+/** The result of parsing curtab's command-line arguments. */
+export interface ParsedArgs {
+  /** Positional commands, one per tab, in order. */
+  commands: string[];
+  /** Custom tab names from `-n`/`--names`, matched to commands positionally. */
+  names: string[];
+  /** `-h`/`--help` was given. */
+  help: boolean;
+  /** `-v`/`--version` was given. */
+  version: boolean;
+}
+
+/**
+ * Parse raw argv (already split by the shell) into commands, names, and flags.
+ *
+ * Flags and their values are stripped out so they never become commands. Each
+ * remaining positional argument is treated as one complete command (never split
+ * on spaces). Names map to commands by position; the TUI falls back to the
+ * command text for any tab without a name.
+ */
+export function parseArgs(argv: string[]): ParsedArgs {
+  const commands: string[] = [];
+  let names: string[] = [];
+  let help = false;
+  let version = false;
+
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--help" || arg === "-h") {
+      help = true;
+    } else if (arg === "--version" || arg === "-v") {
+      version = true;
+    } else if (arg === "--names" || arg === "-n") {
+      names = parseNames(argv[++i] ?? ""); // value is the next token
+    } else if (arg.startsWith("--names=")) {
+      names = parseNames(arg.slice("--names=".length));
+    } else if (arg.startsWith("-n=")) {
+      names = parseNames(arg.slice("-n=".length));
+    } else {
+      const command = arg.trim();
+      if (command.length > 0) commands.push(command);
+    }
+  }
+
+  return { commands, names, help, version };
 }
 
 export interface ShellInvocation {
