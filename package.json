@@ -1,0 +1,64 @@
+{
+  "name": "curtab",
+  "version": "0.1.0",
+  "description": "Run multiple commands at once, each in its own interactive terminal tab.",
+  "keywords": [
+    "cli",
+    "terminal",
+    "tabs",
+    "pty",
+    "tui",
+    "blessed",
+    "node-pty",
+    "process",
+    "multiplex"
+  ],
+  "license": "MIT",
+  "author": "Rashid <bugadev@proton.me>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rashidmya/curtab.git"
+  },
+  "homepage": "https://github.com/rashidmya/curtab#readme",
+  "bugs": {
+    "url": "https://github.com/rashidmya/curtab/issues"
+  },
+  "type": "commonjs",
+  "bin": {
+    "curtab": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "node-pty": "^1.0.0",
+    "term.js": "^0.0.7"
+  },
+  "devDependencies": {
+    "@types/blessed": "^0.1.25",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.13.0",
+    "@typescript-eslint/parser": "^7.13.0",
+    "eslint": "^8.57.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}
