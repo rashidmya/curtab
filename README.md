@@ -2,6 +2,8 @@
 
 Run multiple commands at once, each in its own **interactive terminal tab**.
 
+![curtab demo](./demo.gif)
+
 Each command runs in a real pseudo-terminal (PTY), so processes stay fully
 interactive — prompts, colors, and keyboard input all work. Switch between tabs
 with the keyboard; inactive tabs keep running and buffering output.
