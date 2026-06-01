@@ -1,5 +1,9 @@
 # curtab
 
+[![Latest Release](https://img.shields.io/github/v/release/rashidmya/curtab?label=Release)](https://github.com/rashidmya/curtab/releases)
+[![License](https://img.shields.io/github/license/rashidmya/curtab?label=License)](https://github.com/rashidmya/curtab/blob/main/LICENSE)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/rashidmya/curtab/ci.yml?label=CI&logo=github)](https://github.com/rashidmya/curtab/actions/workflows/ci.yml)
+
 Run multiple commands at once, each in its own **interactive terminal tab**.
 
 ![curtab demo](./demo.gif)
