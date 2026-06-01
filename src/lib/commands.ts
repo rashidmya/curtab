@@ -39,6 +39,11 @@ export function parseCommands(argv: string[]): string[] {
   return argv.map((arg) => arg.trim()).filter((arg) => arg.length > 0);
 }
 
+/** True when argv requests the version, e.g. `curtab --version` or `curtab -v`. */
+export function wantsVersion(argv: string[]): boolean {
+  return argv.some((arg) => arg === "--version" || arg === "-v");
+}
+
 export interface ShellInvocation {
   shell: string;
   args: string[];

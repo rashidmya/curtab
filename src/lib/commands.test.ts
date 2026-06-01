@@ -5,6 +5,7 @@ import {
   statusIcon,
   tabLabel,
   classifyInput,
+  wantsVersion,
   USAGE,
 } from "./commands";
 
@@ -43,6 +44,25 @@ describe("USAGE", () => {
     expect(parseCommands([])).toHaveLength(0);
     expect(USAGE).toContain("curtab");
     expect(USAGE.toLowerCase()).toContain("usage");
+  });
+});
+
+describe("wantsVersion", () => {
+  it("is true when --version is present", () => {
+    expect(wantsVersion(["--version"])).toBe(true);
+  });
+
+  it("is true for the -v short flag", () => {
+    expect(wantsVersion(["-v"])).toBe(true);
+  });
+
+  it("is true even when mixed with other arguments", () => {
+    expect(wantsVersion(["npm run dev", "--version"])).toBe(true);
+  });
+
+  it("is false when no version flag is given", () => {
+    expect(wantsVersion(["npm run dev", "npm run api"])).toBe(false);
+    expect(wantsVersion([])).toBe(false);
   });
 });
 
