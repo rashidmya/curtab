@@ -69,7 +69,10 @@ export class CurtabApp {
   private active = 0;
   private exiting = false;
 
-  constructor(private commands: string[]) {
+  constructor(
+    private commands: string[],
+    private names: string[] = [],
+  ) {
     this.screen = blessed.screen({
       smartCSR: true,
       title: "curtab",
@@ -157,7 +160,7 @@ export class CurtabApp {
 
     const tab: ProcessTab = {
       id: index,
-      name: command,
+      name: this.names[index]?.trim() || command,
       command,
       pty,
       widget,

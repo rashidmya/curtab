@@ -10,14 +10,6 @@ with the keyboard; inactive tabs keep running and buffering output.
 curtab 'npm run dev' 'npm run api'
 ```
 
-```
- ● 1:npm run dev   ✓ 2:npm run api
-┌────────────────────────────────────────┐
-│  active tab's live output (in color)    │
-└────────────────────────────────────────┘
- Alt+1-9 tab  Alt+R restart  Alt+K kill  Wheel scroll  Ctrl+C quit
-```
-
 ## Install
 
 ```bash
@@ -47,6 +39,22 @@ curtab 'npm run dev' 'npm run api'
 > ```json
 > { "scripts": { "dev": "curtab \"npm run web\" \"npm run api\"" } }
 > ```
+
+## Options
+
+| Flag | Description |
+| --- | --- |
+| `-n`, `--names "a, b"` | Custom tab names (comma-separated), matched to commands in order. Missing names fall back to the command text. |
+| `-h`, `--help` | Show usage and exit. |
+| `-v`, `--version` | Print the curtab version and exit. |
+
+By default each tab is labelled with its command. Give friendlier names with
+`-n` / `--names` — the names map to commands left-to-right:
+
+```bash
+curtab -n 'web, api' 'npm run dev' 'npm run api'
+#  ● 1:web   ● 2:api
+```
 
 ## Keyboard controls
 
