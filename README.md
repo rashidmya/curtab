@@ -30,32 +30,16 @@ that contain spaces — curtab never splits an argument on spaces, so
 curtab 'npm run dev' 'npm run api'
 ```
 
-> **Windows** (double quotes — most Windows shells don't support single quotes):
->
-> ```bash
-> curtab "npm run dev" "npm run api"
-> ```
->
-> In a `package.json` script **on Windows**, the double quotes must be escaped:
->
-> ```json
-> { "scripts": { "dev": "curtab \"npm run web\" \"npm run api\"" } }
-> ```
-
-## Options
-
-| Flag | Description |
-| --- | --- |
-| `-n`, `--names "a, b"` | Custom tab names (comma-separated), matched to commands in order. Missing names fall back to the command text. |
-| `-h`, `--help` | Show usage and exit. |
-| `-v`, `--version` | Print the curtab version and exit. |
-
-By default each tab is labelled with its command. Give friendlier names with
-`-n` / `--names` — the names map to commands left-to-right:
+**Windows** (double quotes — most Windows shells don't support single quotes):
 
 ```bash
-curtab -n 'web, api' 'npm run dev' 'npm run api'
-#  ● 1:web   ● 2:api
+curtab "npm run dev" "npm run api"
+```
+
+In a `package.json` script **on Windows**, the double quotes must be escaped:
+
+```json
+{ "scripts": { "dev": "curtab \"npm run web\" \"npm run api\"" } }
 ```
 
 ## Keyboard controls
@@ -71,13 +55,8 @@ curtab -n 'web, api' 'npm run dev' 'npm run api'
 Tab status: `●` running · `✓` exited ok · `✕` exited with error · `■` killed.
 
 ## Notes
-
-- Tab switching uses `Alt`+digit, not `Ctrl`+digit — most terminals can't
-  transmit `Ctrl`+digit as a distinct key.
 - In the VS Code terminal, `Shift`+`PageUp`/`PageDown` is captured by the editor;
   use the mouse wheel to scroll history there.
-- Full-screen apps (`vim`, `htop`, …) work via the embedded terminal emulator;
-  very exotic escape sequences may not render perfectly.
 
 ## Develop
 
