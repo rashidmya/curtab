@@ -31,6 +31,17 @@ export function resetScrollRegion(): string {
 }
 
 /**
+ * Clear the screen for a repaint: erase the visible display (`2J`), erase the
+ * saved/scrollback lines (`3J`), and home the cursor (`H`). The `3J` is what
+ * makes scrollback per-tab — the real terminal has one shared scrollback, so on
+ * switch we must evict the previous tab's scrolled-off output before replaying
+ * this tab's snapshot, otherwise it bleeds through when the user scrolls up.
+ */
+export function clearScreen(): string {
+  return `${ESC}[2J${ESC}[3J${ESC}[H`;
+}
+
+/**
  * The visible text of the status bar, truncated to `cols`, with the active tab
  * shown in inverse video. SGR codes do not count toward the column budget.
  */

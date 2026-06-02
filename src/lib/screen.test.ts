@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  clearScreen,
   paintStatusBar,
   resetScrollRegion,
   setScrollRegion,
@@ -20,6 +21,15 @@ describe("scroll region", () => {
   });
   it("resets to the full screen", () => {
     expect(resetScrollRegion()).toBe("\x1b[r");
+  });
+});
+
+describe("clearScreen", () => {
+  it("erases the display AND the scrollback, then homes the cursor", () => {
+    // \x1b[3J (erase saved lines) is essential: without it the previous tab's
+    // scrolled-off output stays in the terminal's shared scrollback and bleeds
+    // through when the user scrolls up in the new tab.
+    expect(clearScreen()).toBe("\x1b[2J\x1b[3J\x1b[H");
   });
 });
 

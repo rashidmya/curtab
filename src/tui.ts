@@ -10,6 +10,7 @@
  */
 import { classifyInput, type InputAction } from "./lib/commands";
 import {
+  clearScreen,
   paintStatusBar,
   resetScrollRegion,
   setScrollRegion,
@@ -98,7 +99,7 @@ export class CurtabApp {
     const tab = this.tabs[this.active];
     if (!tab) return;
     this.write(setScrollRegion(rows));
-    this.write("\x1b[2J\x1b[H"); // clear, cursor home
+    this.write(clearScreen()); // clear screen + scrollback so tabs don't bleed
     this.write(await tab.snapshot());
     this.paintStatus();
   }
