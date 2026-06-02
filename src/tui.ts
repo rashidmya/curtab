@@ -29,8 +29,6 @@ export interface ProcessTab {
   scrollY: number;
 }
 
-const WHEEL_LINES = 3; // lines scrolled per mouse-wheel notch
-
 /**
  * blessed's terminal renderer always draws the *bottom* `rows` lines of the
  * term.js buffer, ignoring the scroll position (`term.ydisp`). We wrap render
@@ -59,7 +57,7 @@ const FOOTER_TEXT =
   " {bold}Alt+1..9{/bold} tab  " +
   "{bold}Alt+R{/bold} restart  " +
   "{bold}Alt+K{/bold} kill  " +
-  "{bold}Wheel/Shift+PgUp{/bold} scroll  " +
+  "{bold}Shift+PgUp/PgDn{/bold} scroll  " +
   "{bold}Ctrl+C{/bold} quit ";
 
 export class CurtabApp {
@@ -111,16 +109,8 @@ export class CurtabApp {
     this.showActive();
     this.renderTabBar();
 
-    // Keep terminal mouse reporting ON so the scroll wheel and pointer movement
-    // are delivered as mouse-report escape sequences (which onInput drops below)
-    // rather than being translated by the terminal into arrow-key presses that
-    // would leak into the active PTY as junk.
-    try {
-      this.screen.program.enableMouse();
-    } catch {
-      /* ignore */
-    }
-
+    // Don't enable mouse reporting — it would capture clicks and break the
+    // terminal's native text selection. History scrolls via Shift+PgUp/PgDn.
     this.screen.program.input.on("data", this.onInput);
     this.screen.on("resize", this.onResize);
 
@@ -314,13 +304,9 @@ export class CurtabApp {
         this.switchTo(action.index);
         return;
       case "scroll": {
-        const lines = action.unit === "page" ? this.pageSize() : WHEEL_LINES;
-        this.scrollActive(action.direction * lines);
+        this.scrollActive(action.direction * this.pageSize());
         return;
       }
-      case "ignore":
-        // A mouse report we deliberately drop so it can't reach the PTY as junk.
-        return;
       case "forward": {
         // Everything else goes to the active PTY so the process stays interactive.
         const tab = this.tabs[this.active];
