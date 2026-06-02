@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex -- tests assert on terminal control sequences by design */
 import { describe, expect, it } from "vitest";
 import { ShadowScreen } from "./shadow";
 

@@ -46,21 +46,26 @@ In a `package.json` script **on Windows**, the double quotes must be escaped:
 { "scripts": { "dev": "curtab \"npm run web\" \"npm run api\"" } }
 ```
 
-## Keyboard controls
+## Controls
+
+curtab uses a `Ctrl`+`B` leader, like a multiplexer. Press `Ctrl`+`B`, then:
 
 | Key | Action |
 | --- | --- |
-| `Alt`+`1`…`9` | Switch to tab |
-| `Alt`+`R` | Restart the active process |
-| `Alt`+`K` | Kill the active process |
-| Mouse wheel / `Shift`+`PageUp`/`PageDown` | Scroll the active tab's history |
-| `Ctrl`+`C` | Quit (kills all processes) |
+| `1`…`9` | Switch to tab N |
+| `n` / `p` | Next / previous tab |
+| `r` | Restart the active process |
+| `k` | Kill the active process |
+| `Ctrl`+`B` | Send a literal `Ctrl`+`B` to the app |
+
+`Ctrl`+`C` (without the leader) quits curtab and kills all processes.
 
 Tab status: `●` running · `✓` exited ok · `✕` exited with error · `■` killed.
 
-## Notes
-- In the VS Code terminal, `Shift`+`PageUp`/`PageDown` is captured by the editor;
-  use the mouse wheel to scroll history there.
+Everything else — mouse, text selection, copy/paste, scroll wheel, scrollback,
+and colors — is handled natively by your terminal. curtab passes each tab's
+output straight through and keeps an off-screen copy only to repaint a tab when
+you switch back to it.
 
 ## Develop
 
