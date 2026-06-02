@@ -59,25 +59,28 @@ of curtab's output to scroll natively. The wheel is therefore made a no-op.
 
 All changes are confined to `src/tui.ts`. No new modules.
 
-1. **Disable mouse capture** — in `start()`, replace
-   `this.screen.program.enableMouse()` with `this.screen.program.disableMouse()`.
-   Using `disableMouse()` (rather than deleting the line) forces mouse reporting
-   off even if blessed enabled it during tab construction (it does so under
-   tmux ≥ 2, per `node_modules/blessed/lib/widgets/terminal.js`). It runs after
-   the `createTab` loop, so it overrides any such auto-enable.
+1. **Stop capturing the mouse** — in `start()`, **delete** the
+   `this.screen.program.enableMouse()` call (and its surrounding try/catch).
+   A fresh terminal defaults to mouse-reporting off, and blessed only enables it
+   when a mouse/click/wheel listener is attached (curtab attaches none) or under
+   tmux ≥ 2 (`node_modules/blessed/lib/widgets/terminal.js`). The user does not
+   run curtab under tmux, so simply removing the call leaves mouse reporting off
+   — no explicit `disableMouse()` needed.
 
-2. **Suppress wheel→arrow junk** — immediately after, call
-   `this.screen.program.resetMode('?1007')` (emits `ESC[?1007l`). In the
-   alternate screen, VTE/gnome-terminal otherwise translates the wheel into
-   arrow-key presses (xterm "alternate scroll", mode `?1007`) that would leak
-   into the active PTY as junk. Disabling `?1007` makes the wheel an inert no-op.
-   Terminals that do not implement `?1007` ignore the sequence harmlessly.
+2. **Suppress wheel→arrow junk** — in `start()`, call
+   `this.screen.program.resetMode('?1007')` (emits `ESC[?1007l`). This is the
+   one load-bearing line. In the alternate screen, VTE/gnome-terminal otherwise
+   translates the wheel into arrow-key presses (xterm "alternate scroll", mode
+   `?1007`) that would flow through `classifyInput` as `forward` and leak into
+   the active PTY as junk — the exact problem the original `enableMouse()` call
+   was guarding against. Disabling `?1007` makes the wheel an inert no-op.
+   Wheel-arrows are byte-identical to real arrow keys, so this cannot be
+   filtered in `classifyInput`; `?1007` off is the only clean lever. Terminals
+   that do not implement `?1007` ignore the sequence harmlessly. No quit-time
+   restore is added — leaving alternate-scroll off for the rest of the terminal
+   session is inconsequential (other apps set their own modes).
 
-3. **Restore on exit** — in `quit()`, call `this.screen.program.setMode('?1007')`
-   to leave the terminal's alternate-scroll mode as we found it. Best-effort;
-   wrapped so it cannot block shutdown.
-
-4. **Footer text** — `FOOTER_TEXT` currently reads
+3. **Footer text** — `FOOTER_TEXT` currently reads
    `{bold}Wheel/Shift+PgUp{/bold} scroll`. Since the wheel no longer scrolls,
    change it to `{bold}Shift+PgUp/PgDn{/bold} scroll`. No copy key is advertised
    (it varies by terminal and OS).
@@ -104,6 +107,8 @@ full-screen blessed UI). Verification is manual, in a real terminal:
 
 ## Known caveats
 
-- Under tmux ≥ 2, blessed may re-enable mouse on certain events; the explicit
-  `disableMouse()` at startup covers construction but a deeper tmux integration
-  is out of scope for this change.
+- Under tmux ≥ 2, blessed auto-enables the mouse during terminal-widget
+  construction, so this change would not fully take effect there. The user does
+  not run curtab under tmux, so this is out of scope; if tmux support is wanted
+  later, add an explicit `this.screen.program.disableMouse()` after the
+  `createTab` loop.
