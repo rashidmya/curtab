@@ -50,11 +50,14 @@ In a `package.json` script **on Windows**, the double quotes must be escaped:
 
 | Key | Action |
 | --- | --- |
-| `Alt`+`1`…`9` | Switch to tab |
-| `Alt`+`R` | Restart the active process |
-| `Alt`+`K` | Kill the active process |
+| `Ctrl`+`B` then `1`…`9` | Switch to tab |
+| `Ctrl`+`B` then `n` / `p` | Next / previous tab |
+| `Ctrl`+`B` then `r` | Restart the active process |
+| `Ctrl`+`B` then `k` | Kill the active process |
 | Mouse wheel / `Shift`+`PageUp`/`PageDown` | Scroll the active tab's history |
 | `Ctrl`+`C` | Quit (kills all processes) |
+
+`Ctrl`+`B` is a leader key: press and release it, then press the command key.
 
 Tab status: `●` running · `✓` exited ok · `✕` exited with error · `■` killed.
 

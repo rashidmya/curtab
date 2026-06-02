@@ -182,30 +182,96 @@ describe("tabLabel", () => {
 });
 
 describe("classifyInput", () => {
-  it("maps Ctrl+C to quit", () => {
-    expect(classifyInput("\x03")).toEqual({ kind: "quit" });
+  const CTRL_B = "\x02";
+
+  it("maps Ctrl+C to quit when no leader is pending", () => {
+    expect(classifyInput("\x03")).toEqual({
+      action: { kind: "quit" },
+      leaderPending: false,
+    });
   });
 
-  it("maps Alt+R to restart and Alt+K to kill", () => {
-    expect(classifyInput("\x1br")).toEqual({ kind: "restart" });
-    expect(classifyInput("\x1bk")).toEqual({ kind: "kill" });
+  it("arms the leader on Ctrl+B and consumes it", () => {
+    expect(classifyInput(CTRL_B)).toEqual({
+      action: { kind: "ignore" },
+      leaderPending: true,
+    });
   });
 
-  it("maps Alt+<digit> to a 0-based tab index", () => {
-    expect(classifyInput("\x1b1")).toEqual({ kind: "switchTab", index: 0 });
-    expect(classifyInput("\x1b9")).toEqual({ kind: "switchTab", index: 8 });
+  it("jumps to a 0-based tab on a digit after the leader", () => {
+    expect(classifyInput("1", true)).toEqual({
+      action: { kind: "switchTab", index: 0 },
+      leaderPending: false,
+    });
+    expect(classifyInput("9", true)).toEqual({
+      action: { kind: "switchTab", index: 8 },
+      leaderPending: false,
+    });
   });
 
-  it("does not treat Alt+0 as a tab switch (no tab 0)", () => {
-    expect(classifyInput("\x1b0")).toEqual({ kind: "forward" });
+  it("cycles next on n and previous on p after the leader", () => {
+    expect(classifyInput("n", true)).toEqual({
+      action: { kind: "cycleTab", delta: 1 },
+      leaderPending: false,
+    });
+    expect(classifyInput("p", true)).toEqual({
+      action: { kind: "cycleTab", delta: -1 },
+      leaderPending: false,
+    });
+  });
+
+  it("restarts on r and kills on k after the leader", () => {
+    expect(classifyInput("r", true)).toEqual({
+      action: { kind: "restart" },
+      leaderPending: false,
+    });
+    expect(classifyInput("k", true)).toEqual({
+      action: { kind: "kill" },
+      leaderPending: false,
+    });
+  });
+
+  it("forwards a literal Ctrl+B on a doubled leader", () => {
+    expect(classifyInput(CTRL_B, true)).toEqual({
+      action: { kind: "forward", data: CTRL_B },
+      leaderPending: false,
+    });
+  });
+
+  it("ignores an unrecognized key after the leader and disarms", () => {
+    expect(classifyInput("z", true)).toEqual({
+      action: { kind: "ignore" },
+      leaderPending: false,
+    });
+    expect(classifyInput("\x1bOA", true)).toEqual({
+      action: { kind: "ignore" },
+      leaderPending: false,
+    });
+  });
+
+  it("does not treat 0 as a tab switch after the leader", () => {
+    expect(classifyInput("0", true)).toEqual({
+      action: { kind: "ignore" },
+      leaderPending: false,
+    });
+  });
+
+  it("handles leader and command arriving in one buffer", () => {
+    expect(classifyInput(CTRL_B + "n")).toEqual({
+      action: { kind: "cycleTab", delta: 1 },
+      leaderPending: false,
+    });
+    expect(classifyInput(CTRL_B + "3")).toEqual({
+      action: { kind: "switchTab", index: 2 },
+      leaderPending: false,
+    });
   });
 
   it("maps every Shift/Alt PageUp encoding to a page scroll up", () => {
     for (const seq of ["\x1b[5;2~", "\x1b[5$", "\x1b[5;3~"]) {
       expect(classifyInput(seq)).toEqual({
-        kind: "scroll",
-        direction: -1,
-        unit: "page",
+        action: { kind: "scroll", direction: -1, unit: "page" },
+        leaderPending: false,
       });
     }
   });
@@ -213,16 +279,39 @@ describe("classifyInput", () => {
   it("maps every PageDown encoding to a page scroll down", () => {
     for (const seq of ["\x1b[6;2~", "\x1b[6$", "\x1b[6;3~"]) {
       expect(classifyInput(seq)).toEqual({
-        kind: "scroll",
-        direction: 1,
-        unit: "page",
+        action: { kind: "scroll", direction: 1, unit: "page" },
+        leaderPending: false,
       });
     }
   });
 
   it("forwards ordinary keystrokes and unrecognized sequences", () => {
-    expect(classifyInput("a")).toEqual({ kind: "forward" });
-    expect(classifyInput("\x1bOA")).toEqual({ kind: "forward" }); // arrow up
-    expect(classifyInput("")).toEqual({ kind: "forward" });
+    expect(classifyInput("a")).toEqual({
+      action: { kind: "forward" },
+      leaderPending: false,
+    });
+    expect(classifyInput("\x1bOA")).toEqual({
+      action: { kind: "forward" },
+      leaderPending: false,
+    }); // arrow up
+    expect(classifyInput("")).toEqual({
+      action: { kind: "forward" },
+      leaderPending: false,
+    });
+  });
+
+  it("forwards the old Alt bindings now that they are unbound", () => {
+    expect(classifyInput("\x1b1")).toEqual({
+      action: { kind: "forward" },
+      leaderPending: false,
+    });
+    expect(classifyInput("\x1br")).toEqual({
+      action: { kind: "forward" },
+      leaderPending: false,
+    });
+    expect(classifyInput("\x1bk")).toEqual({
+      action: { kind: "forward" },
+      leaderPending: false,
+    });
   });
 });

@@ -54,9 +54,11 @@ function patchScrollbackRender(widget: any): void {
 }
 
 const FOOTER_TEXT =
-  " {bold}Alt+1..9{/bold} tab  " +
-  "{bold}Alt+R{/bold} restart  " +
-  "{bold}Alt+K{/bold} kill  " +
+  " {bold}Ctrl+B{/bold} then  " +
+  "{bold}1-9{/bold} tab  " +
+  "{bold}n/p{/bold} next/prev  " +
+  "{bold}r{/bold} restart  " +
+  "{bold}k{/bold} kill   " +
   "{bold}Shift+PgUp/PgDn{/bold} scroll  " +
   "{bold}Ctrl+C{/bold} quit ";
 
@@ -66,6 +68,7 @@ export class CurtabApp {
   private tabs: ProcessTab[] = [];
   private active = 0;
   private exiting = false;
+  private leaderPending = false;
 
   constructor(
     private commands: string[],
@@ -288,7 +291,8 @@ export class CurtabApp {
   private onInput = (data: Buffer | string): void => {
     if (this.exiting) return;
     const seq = typeof data === "string" ? data : data.toString("utf8");
-    const action = classifyInput(seq);
+    const { action, leaderPending } = classifyInput(seq, this.leaderPending);
+    this.leaderPending = leaderPending;
 
     switch (action.kind) {
       case "quit":
@@ -303,14 +307,23 @@ export class CurtabApp {
       case "switchTab":
         this.switchTo(action.index);
         return;
+      case "cycleTab": {
+        const n = this.tabs.length;
+        if (n > 0) this.switchTo((this.active + action.delta + n) % n);
+        return;
+      }
       case "scroll": {
         this.scrollActive(action.direction * this.pageSize());
         return;
       }
+      case "ignore":
+        // A sequence we deliberately drop so it can't reach the PTY as junk.
+        return;
       case "forward": {
-        // Everything else goes to the active PTY so the process stays interactive.
+        // Everything else goes to the active PTY so the process stays
+        // interactive. `data` is set only for a literal Ctrl+B (doubled leader).
         const tab = this.tabs[this.active];
-        if (tab && tab.status === "running") tab.pty.write(seq);
+        if (tab && tab.status === "running") tab.pty.write(action.data ?? seq);
         return;
       }
     }
