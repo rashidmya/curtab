@@ -1,8 +1,8 @@
 /**
  * Pure, side-effect-free logic for curtab.
  *
- * Everything here is deliberately decoupled from node-pty and the blessed TUI
- * so it can be unit tested without spawning real processes or a terminal.
+ * Everything here is deliberately decoupled from node-pty and the TUI layer so
+ * it can be unit tested without spawning real processes or a terminal.
  */
 
 export type TabStatus = "running" | "exited" | "killed";
