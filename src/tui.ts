@@ -112,8 +112,14 @@ export class CurtabApp {
     this.showActive();
     this.renderTabBar();
 
-    // Don't enable mouse reporting — it would capture clicks and break the
+    // Don't report mouse events — they would capture clicks and break the
     // terminal's native text selection. History scrolls via Shift+PgUp/PgDn.
+    // blessed's terminal widget turns mouse reporting on when it's created
+    // (see its bootstrap), so undo that here now that all tabs exist. Without
+    // this, the terminal sends mouse-report sequences on move/scroll that get
+    // forwarded to the shell and printed as junk characters.
+    this.screen.program.disableMouse();
+
     this.screen.program.input.on("data", this.onInput);
     this.screen.on("resize", this.onResize);
 
@@ -317,7 +323,8 @@ export class CurtabApp {
         return;
       }
       case "ignore":
-        // A sequence we deliberately drop so it can't reach the PTY as junk.
+        // A sequence we deliberately drop (unbound leader key, or a mouse
+        // report) so it can't reach the PTY as junk.
         return;
       case "forward": {
         // Everything else goes to the active PTY so the process stays

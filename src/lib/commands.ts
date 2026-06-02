@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex -- input decoding matches terminal control sequences by design */
 /**
  * Pure, side-effect-free logic for curtab.
  *
@@ -141,7 +142,7 @@ export function tabLabel(tab: {
   return `${statusIcon(tab.status, tab.exitCode)} ${tab.id + 1}:${tab.name}`;
 }
 
-// --- Keyboard input decoding ---------------------------------------------
+// --- Keyboard / mouse input decoding -------------------------------------
 // Control bytes and escape sequences curtab acts on. Everything else is
 // forwarded to the active PTY so the running process stays interactive.
 const CTRL_C = "\x03";
@@ -153,7 +154,13 @@ const CTRL_B = "\x02"; // leader key — press it, then a command key
 const PAGE_UP_KEYS = ["\x1b[5;2~", "\x1b[5$", "\x1b[5;3~"];
 const PAGE_DOWN_KEYS = ["\x1b[6;2~", "\x1b[6$", "\x1b[6;3~"];
 
-/** A decoded user action, or a passthrough instruction for the TUI. */
+// Mouse-reporting sequences. blessed's terminal widget turns mouse reporting
+// on, so the terminal emits these on move/click/scroll. We drop them rather
+// than forward them to the PTY, where the shell would print them as junk.
+const SGR_MOUSE = /^\x1b\[<[0-9;]+[mM]/; // ESC [ < n;n;n M/m
+const URXVT_MOUSE = /^\x1b\[[0-9;]+M$/; // ESC [ n;n;n M
+
+/** A decoded user action, or a passthrough/ignore instruction for the TUI. */
 export type InputAction =
   | { kind: "quit" }
   | { kind: "restart" }
@@ -163,6 +170,11 @@ export type InputAction =
   | { kind: "scroll"; direction: 1 | -1; unit: "page" } // -1 = up
   | { kind: "ignore" } // a sequence we drop so it can't reach the PTY
   | { kind: "forward"; data?: string }; // send to PTY; data overrides raw seq
+
+/** True for terminal mouse-reporting sequences (X10, SGR, urxvt encodings). */
+function isMouseSequence(seq: string): boolean {
+  return seq.startsWith("\x1b[M") || SGR_MOUSE.test(seq) || URXVT_MOUSE.test(seq);
+}
 
 /**
  * The result of decoding one input event: the action to take, plus whether the
@@ -195,6 +207,8 @@ function classifyUnprefixed(seq: string): InputAction {
   if (PAGE_DOWN_KEYS.includes(seq)) {
     return { kind: "scroll", direction: 1, unit: "page" };
   }
+  if (isMouseSequence(seq)) return { kind: "ignore" };
+
   return { kind: "forward" };
 }
 

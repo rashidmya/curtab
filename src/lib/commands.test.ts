@@ -285,6 +285,18 @@ describe("classifyInput", () => {
     }
   });
 
+  it("ignores mouse reports so they never reach the PTY", () => {
+    // The blessed terminal widget turns on mouse reporting, so the terminal
+    // emits these on move/click/scroll. Dropping them keeps the bytes from
+    // being forwarded to the shell, which would otherwise print them as junk.
+    const ignored = { action: { kind: "ignore" }, leaderPending: false };
+    expect(classifyInput("\x1b[<35;10;5M")).toEqual(ignored); // SGR move
+    expect(classifyInput("\x1b[<0;10;5m")).toEqual(ignored); // SGR release
+    expect(classifyInput("\x1b[<64;10;5M")).toEqual(ignored); // SGR wheel up
+    expect(classifyInput("\x1b[M\x20\x40\x40")).toEqual(ignored); // X10 click
+    expect(classifyInput("\x1b[35;10;5M")).toEqual(ignored); // urxvt
+  });
+
   it("forwards ordinary keystrokes and unrecognized sequences", () => {
     expect(classifyInput("a")).toEqual({
       action: { kind: "forward" },
