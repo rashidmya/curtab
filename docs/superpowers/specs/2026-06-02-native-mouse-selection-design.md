@@ -1,0 +1,109 @@
+# Native mouse text selection in curtab
+
+**Date:** 2026-06-02
+**Status:** Approved (design)
+
+## Problem
+
+In the curtab TUI, selecting text with the mouse does not work unless the user
+holds **Shift** first, and dragging the mouse upward during a selection
+highlights the tab-bar text instead of scrolling into history.
+
+### Root cause
+
+At startup, `tui.ts` calls `this.screen.program.enableMouse()`. On the user's
+terminal (gnome-terminal / VTE) this turns on full mouse reporting (DEC modes
+`?1000` + `?1002` + `?1003` any-motion + SGR `?1006`), confirmed in
+`node_modules/blessed/lib/program.js`. With mouse reporting on:
+
+1. The terminal routes all click/drag events to curtab instead of performing
+   native selection. Holding **Shift** is the standard terminal override that
+   bypasses the app's mouse grab — hence "selection only works with Shift."
+2. curtab is a full-screen *alternate-screen* app that keeps its scrollback in
+   its own term.js buffer and only paints the visible window. Native selection
+   can only ever highlight what is currently on screen; dragging above the top
+   edge highlights the tab bar. Native selection cannot drive curtab's internal
+   scroll.
+
+These are two faces of one cause: curtab captures the mouse.
+
+## Decision
+
+Adopt the **"regular terminal feel"** resolution: curtab stops capturing the
+mouse. The terminal then owns selection — plain click-drag selects with no
+Shift, and the terminal's own `Ctrl+Shift+C` copies it.
+
+Trade-offs explicitly accepted by the user:
+
+- The mouse **wheel** no longer scrolls curtab's history. History is scrolled
+  with `Shift+PgUp` / `Shift+PgDn` (already supported).
+- "Drag up to extend the selection into history" is **not** provided. Native
+  selection can only highlight on-screen text in an alternate-screen app. This
+  is a fundamental constraint, not a deferred feature.
+
+Rejected alternatives: an in-app selection engine with its own copy key
+(`Alt+C`) — gives drag-into-history but cannot use `Ctrl+Shift+C` because the
+terminal intercepts that key before curtab sees it; and a toggle key (tmux
+style) — more flexible but adds a mode and a keybinding the user did not want.
+
+## Why the wheel cannot also scroll
+
+The wheel is reported as button-press events (buttons 64/65) under the *same*
+tracking mode that reports clicks. There is no "wheel-only" mouse mode.
+Capturing the wheel therefore necessarily captures clicks, which re-imposes the
+Shift requirement on selection. No-Shift selection and wheel-scroll cannot both
+be active at once. In the alternate screen the terminal also has no scrollback
+of curtab's output to scroll natively. The wheel is therefore made a no-op.
+
+## Implementation
+
+All changes are confined to `src/tui.ts`. No new modules.
+
+1. **Disable mouse capture** — in `start()`, replace
+   `this.screen.program.enableMouse()` with `this.screen.program.disableMouse()`.
+   Using `disableMouse()` (rather than deleting the line) forces mouse reporting
+   off even if blessed enabled it during tab construction (it does so under
+   tmux ≥ 2, per `node_modules/blessed/lib/widgets/terminal.js`). It runs after
+   the `createTab` loop, so it overrides any such auto-enable.
+
+2. **Suppress wheel→arrow junk** — immediately after, call
+   `this.screen.program.resetMode('?1007')` (emits `ESC[?1007l`). In the
+   alternate screen, VTE/gnome-terminal otherwise translates the wheel into
+   arrow-key presses (xterm "alternate scroll", mode `?1007`) that would leak
+   into the active PTY as junk. Disabling `?1007` makes the wheel an inert no-op.
+   Terminals that do not implement `?1007` ignore the sequence harmlessly.
+
+3. **Restore on exit** — in `quit()`, call `this.screen.program.setMode('?1007')`
+   to leave the terminal's alternate-scroll mode as we found it. Best-effort;
+   wrapped so it cannot block shutdown.
+
+4. **Footer text** — `FOOTER_TEXT` currently reads
+   `{bold}Wheel/Shift+PgUp{/bold} scroll`. Since the wheel no longer scrolls,
+   change it to `{bold}Shift+PgUp/PgDn{/bold} scroll`. No copy key is advertised
+   (it varies by terminal and OS).
+
+### Left unchanged
+
+- `classifyInput` in `src/lib/commands.ts` — its wheel/mouse-report branches
+  become dead (those sequences no longer arrive) but remain as harmless
+  defensive code. Its unit tests stay green because the logic is untouched.
+- Keyboard scrolling (`Shift+PgUp` / `Shift+PgDn`) and the custom scrollback
+  renderer (`patchScrollbackRender`, `term.ydisp`) are unaffected.
+
+## Testing
+
+`tui.ts` is intentionally not unit-tested (it drives a real PTY and a
+full-screen blessed UI). Verification is manual, in a real terminal:
+
+1. Click-drag over output → text is selected **without** holding Shift.
+2. `Ctrl+Shift+C` → selected text lands on the system clipboard.
+3. Spin the mouse wheel → nothing scrolls **and** no stray characters reach the
+   shell in the active tab.
+4. `Shift+PgUp` / `Shift+PgDn` → history still scrolls.
+5. Existing `classifyInput` unit tests remain green.
+
+## Known caveats
+
+- Under tmux ≥ 2, blessed may re-enable mouse on certain events; the explicit
+  `disableMouse()` at startup covers construction but a deeper tmux integration
+  is out of scope for this change.
