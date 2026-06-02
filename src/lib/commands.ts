@@ -1,4 +1,3 @@
-/* eslint-disable no-control-regex -- input decoding matches terminal control sequences by design */
 /**
  * Pure, side-effect-free logic for curtab.
  *
@@ -142,7 +141,7 @@ export function tabLabel(tab: {
   return `${statusIcon(tab.status, tab.exitCode)} ${tab.id + 1}:${tab.name}`;
 }
 
-// --- Keyboard / mouse input decoding -------------------------------------
+// --- Keyboard input decoding ---------------------------------------------
 // Control bytes and escape sequences curtab acts on. Everything else is
 // forwarded to the active PTY so the running process stays interactive.
 const CTRL_C = "\x03";
@@ -155,37 +154,14 @@ const ALT_R = "\x1br"; // Alt+R — restart (Ctrl+R is readline reverse-search)
 const PAGE_UP_KEYS = ["\x1b[5;2~", "\x1b[5$", "\x1b[5;3~"];
 const PAGE_DOWN_KEYS = ["\x1b[6;2~", "\x1b[6$", "\x1b[6;3~"];
 
-const SGR_MOUSE = /^\x1b\[<[0-9;]+[mM]/; // ESC [ < n;n;n M/m
-const URXVT_MOUSE = /^\x1b\[[0-9;]+M$/; // ESC [ n;n;n M
-const SGR_WHEEL_UP = /^\x1b\[<64;/;
-const SGR_WHEEL_DOWN = /^\x1b\[<65;/;
-
-/** A decoded user action, or a passthrough/ignore instruction for the TUI. */
+/** A decoded user action, or a passthrough instruction for the TUI. */
 export type InputAction =
   | { kind: "quit" }
   | { kind: "restart" }
   | { kind: "kill" }
   | { kind: "switchTab"; index: number } // 0-based tab index
-  | { kind: "scroll"; direction: 1 | -1; unit: "page" | "wheel" } // -1 = up
-  | { kind: "ignore" } // a mouse report we drop so it can't reach the PTY
+  | { kind: "scroll"; direction: 1 | -1; unit: "page" } // -1 = up
   | { kind: "forward" }; // send the raw sequence to the active PTY
-
-/** True for terminal mouse-reporting sequences (X10, SGR, urxvt encodings). */
-function isMouseSequence(seq: string): boolean {
-  return seq.startsWith("\x1b[M") || SGR_MOUSE.test(seq) || URXVT_MOUSE.test(seq);
-}
-
-/** -1 for a wheel-up report, 1 for wheel-down, 0 if not a wheel event. */
-function wheelDirection(seq: string): 1 | -1 | 0 {
-  if (SGR_WHEEL_UP.test(seq)) return -1;
-  if (SGR_WHEEL_DOWN.test(seq)) return 1;
-  if (seq.startsWith("\x1b[M") && seq.length >= 4) {
-    const button = seq.charCodeAt(3) - 32;
-    if (button === 64) return -1; // X10 wheel up
-    if (button === 65) return 1; // X10 wheel down
-  }
-  return 0;
-}
 
 /** True for Alt+<1-9> (ESC followed by a single non-zero digit). */
 function isAltDigit(seq: string): boolean {
@@ -211,10 +187,6 @@ export function classifyInput(seq: string): InputAction {
   if (PAGE_DOWN_KEYS.includes(seq)) {
     return { kind: "scroll", direction: 1, unit: "page" };
   }
-
-  const wheel = wheelDirection(seq);
-  if (wheel !== 0) return { kind: "scroll", direction: wheel, unit: "wheel" };
-  if (isMouseSequence(seq)) return { kind: "ignore" };
 
   return { kind: "forward" };
 }

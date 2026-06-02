@@ -220,29 +220,6 @@ describe("classifyInput", () => {
     }
   });
 
-  it("maps mouse wheel reports to a wheel scroll", () => {
-    expect(classifyInput("\x1b[<64;10;5M")).toEqual({
-      kind: "scroll",
-      direction: -1,
-      unit: "wheel",
-    }); // SGR wheel up
-    expect(classifyInput("\x1b[<65;10;5M")).toEqual({
-      kind: "scroll",
-      direction: 1,
-      unit: "wheel",
-    }); // SGR wheel down
-    expect(classifyInput("\x1b[M\x60\x30\x30")).toEqual({
-      kind: "scroll",
-      direction: -1,
-      unit: "wheel",
-    }); // X10 wheel up (button 96)
-  });
-
-  it("ignores non-wheel mouse reports so they never reach the PTY", () => {
-    expect(classifyInput("\x1b[<35;10;5M")).toEqual({ kind: "ignore" }); // SGR move
-    expect(classifyInput("\x1b[M\x20\x40\x40")).toEqual({ kind: "ignore" }); // X10 click
-  });
-
   it("forwards ordinary keystrokes and unrecognized sequences", () => {
     expect(classifyInput("a")).toEqual({ kind: "forward" });
     expect(classifyInput("\x1bOA")).toEqual({ kind: "forward" }); // arrow up
