@@ -145,8 +145,7 @@ export function tabLabel(tab: {
 // Control bytes and escape sequences curtab acts on. Everything else is
 // forwarded to the active PTY so the running process stays interactive.
 const CTRL_C = "\x03";
-const ALT_K = "\x1bk"; // Alt+K — kill (Ctrl+K is readline kill-line)
-const ALT_R = "\x1br"; // Alt+R — restart (Ctrl+R is readline reverse-search)
+const CTRL_B = "\x02"; // leader key — press it, then a command key
 // Shift+PageUp / Shift+PageDown scroll history. Terminals encode the modifier
 // differently, so accept all common forms (CSI param 2 = Shift, 3 = Alt; the
 // `$` forms are the rxvt encoding). Alt forms are a fallback for terminals that
@@ -160,33 +159,65 @@ export type InputAction =
   | { kind: "restart" }
   | { kind: "kill" }
   | { kind: "switchTab"; index: number } // 0-based tab index
+  | { kind: "cycleTab"; delta: 1 | -1 } // relative move, wraps in the TUI
   | { kind: "scroll"; direction: 1 | -1; unit: "page" } // -1 = up
-  | { kind: "forward" }; // send the raw sequence to the active PTY
-
-/** True for Alt+<1-9> (ESC followed by a single non-zero digit). */
-function isAltDigit(seq: string): boolean {
-  return (
-    seq.length === 2 && seq[0] === "\x1b" && seq[1] >= "1" && seq[1] <= "9"
-  );
-}
+  | { kind: "ignore" } // a sequence we drop so it can't reach the PTY
+  | { kind: "forward"; data?: string }; // send to PTY; data overrides raw seq
 
 /**
- * Decode one raw input sequence into the action curtab should take. This is the
- * single source of truth for curtab's key bindings; the TUI just dispatches on
- * the result. Precedence matters: shortcuts are matched before anything is
- * forwarded to the PTY.
+ * The result of decoding one input event: the action to take, plus whether the
+ * leader key is now armed for the next event.
  */
-export function classifyInput(seq: string): InputAction {
+export interface InputResult {
+  action: InputAction;
+  leaderPending: boolean;
+}
+
+/** Decode the key pressed after the leader into its action. */
+function leaderCommand(seq: string): InputAction {
+  if (seq.length === 1 && seq >= "1" && seq <= "9") {
+    return { kind: "switchTab", index: Number(seq) - 1 };
+  }
+  if (seq === "n") return { kind: "cycleTab", delta: 1 };
+  if (seq === "p") return { kind: "cycleTab", delta: -1 };
+  if (seq === "r") return { kind: "restart" };
+  if (seq === "k") return { kind: "kill" };
+  if (seq === CTRL_B) return { kind: "forward", data: CTRL_B }; // literal Ctrl+B
+  return { kind: "ignore" }; // unbound key — consume it, like a multiplexer
+}
+
+/** Decode an input event when the leader is not armed. */
+function classifyUnprefixed(seq: string): InputAction {
   if (seq === CTRL_C) return { kind: "quit" };
-  if (seq === ALT_R) return { kind: "restart" };
-  if (seq === ALT_K) return { kind: "kill" };
-  if (isAltDigit(seq)) return { kind: "switchTab", index: Number(seq[1]) - 1 };
   if (PAGE_UP_KEYS.includes(seq)) {
     return { kind: "scroll", direction: -1, unit: "page" };
   }
   if (PAGE_DOWN_KEYS.includes(seq)) {
     return { kind: "scroll", direction: 1, unit: "page" };
   }
-
   return { kind: "forward" };
+}
+
+/**
+ * Decode one raw input sequence into the action curtab should take and the next
+ * leader state. This is the single source of truth for curtab's key bindings;
+ * the TUI just holds `leaderPending` and dispatches on the result.
+ *
+ * Ctrl+B is a leader: it arms `leaderPending`, and the next event is read as a
+ * command (digit = jump, n/p = cycle, r/k = restart/kill). A doubled Ctrl+B
+ * forwards a literal Ctrl+B. Precedence matters: shortcuts are matched before
+ * anything is forwarded to the PTY.
+ */
+export function classifyInput(seq: string, leaderPending = false): InputResult {
+  if (leaderPending) {
+    return { action: leaderCommand(seq), leaderPending: false };
+  }
+  if (seq === CTRL_B) {
+    return { action: { kind: "ignore" }, leaderPending: true };
+  }
+  if (seq.length > 1 && seq[0] === CTRL_B) {
+    // Leader and its command arrived in one buffer (fast typing / paste).
+    return classifyInput(seq.slice(1), true);
+  }
+  return { action: classifyUnprefixed(seq), leaderPending: false };
 }
