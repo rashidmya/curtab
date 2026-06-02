@@ -1,6 +1,6 @@
 {
   "name": "curtab",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Run multiple commands at once, each in its own interactive terminal tab.",
   "keywords": [
     "cli",
@@ -34,7 +34,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

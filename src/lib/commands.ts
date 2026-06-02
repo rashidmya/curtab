@@ -21,21 +21,14 @@ Each positional argument is ONE full command and is run through your shell.
 Commands containing spaces must be quoted (use double quotes on Windows).
 
 Options:
-  -n, --names "a, b"   Custom tab names (comma-separated), matched to commands
+  -n, --names 'a,b'   Custom tab names (comma-separated), matched to commands
                        in order. Missing names fall back to the command text.
   -h, --help           Show this help and exit.
   -v, --version        Print the curtab version and exit.
 
 Examples:
   curtab 'npm run dev' 'npm run api'
-  curtab "npm run dev" "npm run api"            # Windows
   curtab -n 'web, api' 'npm run dev' 'npm run api'
-
-Keyboard controls:
-  Alt+1..9    switch to tab by index
-  Alt+R       restart the active process
-  Alt+K       kill the active process
-  Ctrl+C      quit curtab and kill all processes
 `;
 
 /**
