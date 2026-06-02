@@ -15,6 +15,7 @@ export interface BarTab {
 const ESC = "\x1b";
 export const SAVE_CURSOR = `${ESC}7`; // DECSC
 export const RESTORE_CURSOR = `${ESC}8`; // DECRC
+export const SHOW_CURSOR = `${ESC}[?25h`;
 
 /**
  * DECSTBM: limit the scrolling region to rows 1..(rows-1), reserving the bottom
@@ -39,6 +40,16 @@ export function resetScrollRegion(): string {
  */
 export function clearScreen(): string {
   return `${ESC}[2J${ESC}[3J${ESC}[H`;
+}
+
+/**
+ * Sequence to restore the terminal on exit: reset the scroll region to the full
+ * screen, clear the screen + scrollback (like `clear`), and show the cursor.
+ * Without this, curtab's last frame and status bar are left on screen and the
+ * returning shell prompt collides with the leftover content.
+ */
+export function teardown(): string {
+  return resetScrollRegion() + clearScreen() + SHOW_CURSOR;
 }
 
 /**

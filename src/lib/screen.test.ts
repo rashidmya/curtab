@@ -5,6 +5,7 @@ import {
   resetScrollRegion,
   setScrollRegion,
   statusBarText,
+  teardown,
 } from "./screen";
 
 const tabs = [
@@ -30,6 +31,14 @@ describe("clearScreen", () => {
     // scrolled-off output stays in the terminal's shared scrollback and bleeds
     // through when the user scrolls up in the new tab.
     expect(clearScreen()).toBe("\x1b[2J\x1b[3J\x1b[H");
+  });
+});
+
+describe("teardown", () => {
+  it("restores the full region, clears the screen, and shows the cursor", () => {
+    // Order matters: reset the region BEFORE clearing so the clear covers the
+    // whole screen (including the status row), then show the cursor.
+    expect(teardown()).toBe("\x1b[r\x1b[2J\x1b[3J\x1b[H\x1b[?25h");
   });
 });
 

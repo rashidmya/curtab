@@ -12,8 +12,8 @@ import { classifyInput, type InputAction } from "./lib/commands";
 import {
   clearScreen,
   paintStatusBar,
-  resetScrollRegion,
   setScrollRegion,
+  teardown,
 } from "./lib/screen";
 import { Tab } from "./tab";
 
@@ -170,8 +170,7 @@ export class CurtabApp {
   private quit(): void {
     if (this.exiting) return;
     this.exiting = true;
-    this.write(resetScrollRegion());
-    this.write("\x1b[?25h"); // show cursor
+    this.write(teardown()); // reset region, clear screen, show cursor
     for (const tab of this.tabs) tab.dispose();
     if (process.stdin.isTTY) {
       try {
