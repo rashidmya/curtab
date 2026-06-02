@@ -1,4 +1,3 @@
-/* eslint-disable no-control-regex -- input decoding matches terminal control sequences by design */
 /**
  * Pure, side-effect-free logic for curtab.
  *
@@ -142,79 +141,65 @@ export function tabLabel(tab: {
   return `${statusIcon(tab.status, tab.exitCode)} ${tab.id + 1}:${tab.name}`;
 }
 
-// --- Keyboard / mouse input decoding -------------------------------------
-// Control bytes and escape sequences curtab acts on. Everything else is
-// forwarded to the active PTY so the running process stays interactive.
+// --- Keyboard input decoding ---------------------------------------------
+// curtab acts on a tiny set of keys; everything else is forwarded to the
+// active PTY so the running process stays fully interactive.
 const CTRL_C = "\x03";
-const ALT_K = "\x1bk"; // Alt+K — kill (Ctrl+K is readline kill-line)
-const ALT_R = "\x1br"; // Alt+R — restart (Ctrl+R is readline reverse-search)
-// Shift+PageUp / Shift+PageDown scroll history. Terminals encode the modifier
-// differently, so accept all common forms (CSI param 2 = Shift, 3 = Alt; the
-// `$` forms are the rxvt encoding). Alt forms are a fallback for terminals that
-// reserve Shift+Page for their own scrollback.
-const PAGE_UP_KEYS = ["\x1b[5;2~", "\x1b[5$", "\x1b[5;3~"];
-const PAGE_DOWN_KEYS = ["\x1b[6;2~", "\x1b[6$", "\x1b[6;3~"];
+const CTRL_B = "\x02"; // leader key — press it, then a command key
 
-const SGR_MOUSE = /^\x1b\[<[0-9;]+[mM]/; // ESC [ < n;n;n M/m
-const URXVT_MOUSE = /^\x1b\[[0-9;]+M$/; // ESC [ n;n;n M
-const SGR_WHEEL_UP = /^\x1b\[<64;/;
-const SGR_WHEEL_DOWN = /^\x1b\[<65;/;
-
-/** A decoded user action, or a passthrough/ignore instruction for the TUI. */
+/** A decoded user action, or a passthrough instruction for the TUI. */
 export type InputAction =
   | { kind: "quit" }
   | { kind: "restart" }
   | { kind: "kill" }
   | { kind: "switchTab"; index: number } // 0-based tab index
-  | { kind: "scroll"; direction: 1 | -1; unit: "page" | "wheel" } // -1 = up
-  | { kind: "ignore" } // a mouse report we drop so it can't reach the PTY
-  | { kind: "forward" }; // send the raw sequence to the active PTY
+  | { kind: "cycleTab"; delta: 1 | -1 } // relative move, wraps in the TUI
+  | { kind: "ignore" } // consume the key; do not reach the PTY
+  | { kind: "forward"; data?: string }; // send to PTY; data overrides raw seq
 
-/** True for terminal mouse-reporting sequences (X10, SGR, urxvt encodings). */
-function isMouseSequence(seq: string): boolean {
-  return seq.startsWith("\x1b[M") || SGR_MOUSE.test(seq) || URXVT_MOUSE.test(seq);
+/**
+ * The result of decoding one input event: the action to take, plus whether the
+ * leader key is now armed for the next event.
+ */
+export interface InputResult {
+  action: InputAction;
+  leaderPending: boolean;
 }
 
-/** -1 for a wheel-up report, 1 for wheel-down, 0 if not a wheel event. */
-function wheelDirection(seq: string): 1 | -1 | 0 {
-  if (SGR_WHEEL_UP.test(seq)) return -1;
-  if (SGR_WHEEL_DOWN.test(seq)) return 1;
-  if (seq.startsWith("\x1b[M") && seq.length >= 4) {
-    const button = seq.charCodeAt(3) - 32;
-    if (button === 64) return -1; // X10 wheel up
-    if (button === 65) return 1; // X10 wheel down
+/** Decode the key pressed after the leader into its action. */
+function leaderCommand(seq: string): InputAction {
+  if (seq.length === 1 && seq >= "1" && seq <= "9") {
+    return { kind: "switchTab", index: Number(seq) - 1 };
   }
-  return 0;
-}
-
-/** True for Alt+<1-9> (ESC followed by a single non-zero digit). */
-function isAltDigit(seq: string): boolean {
-  return (
-    seq.length === 2 && seq[0] === "\x1b" && seq[1] >= "1" && seq[1] <= "9"
-  );
+  if (seq === "n") return { kind: "cycleTab", delta: 1 };
+  if (seq === "p") return { kind: "cycleTab", delta: -1 };
+  if (seq === "r") return { kind: "restart" };
+  if (seq === "k") return { kind: "kill" };
+  if (seq === CTRL_B) return { kind: "forward", data: CTRL_B }; // literal Ctrl+B
+  return { kind: "ignore" }; // unbound key — consume it, like a multiplexer
 }
 
 /**
- * Decode one raw input sequence into the action curtab should take. This is the
- * single source of truth for curtab's key bindings; the TUI just dispatches on
- * the result. Precedence matters: shortcuts are matched before anything is
- * forwarded to the PTY.
+ * Decode one raw input sequence into the action curtab should take and the next
+ * leader state. This is the single source of truth for curtab's key bindings;
+ * the TUI just holds `leaderPending` and dispatches on the result.
+ *
+ * Ctrl+B is a leader: it arms `leaderPending`, and the next event is read as a
+ * command. A doubled Ctrl+B forwards a literal Ctrl+B. Ctrl+C quits. Everything
+ * else is forwarded so the process stays interactive — the real terminal owns
+ * mouse, selection, and scrollback.
  */
-export function classifyInput(seq: string): InputAction {
-  if (seq === CTRL_C) return { kind: "quit" };
-  if (seq === ALT_R) return { kind: "restart" };
-  if (seq === ALT_K) return { kind: "kill" };
-  if (isAltDigit(seq)) return { kind: "switchTab", index: Number(seq[1]) - 1 };
-  if (PAGE_UP_KEYS.includes(seq)) {
-    return { kind: "scroll", direction: -1, unit: "page" };
+export function classifyInput(seq: string, leaderPending = false): InputResult {
+  if (leaderPending) {
+    return { action: leaderCommand(seq), leaderPending: false };
   }
-  if (PAGE_DOWN_KEYS.includes(seq)) {
-    return { kind: "scroll", direction: 1, unit: "page" };
+  if (seq === CTRL_B) {
+    return { action: { kind: "ignore" }, leaderPending: true };
   }
-
-  const wheel = wheelDirection(seq);
-  if (wheel !== 0) return { kind: "scroll", direction: wheel, unit: "wheel" };
-  if (isMouseSequence(seq)) return { kind: "ignore" };
-
-  return { kind: "forward" };
+  if (seq.length > 1 && seq[0] === CTRL_B) {
+    // Leader and its command arrived in one buffer (fast typing / paste).
+    return classifyInput(seq.slice(1), true);
+  }
+  if (seq === CTRL_C) return { action: { kind: "quit" }, leaderPending: false };
+  return { action: { kind: "forward" }, leaderPending: false };
 }
