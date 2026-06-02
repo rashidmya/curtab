@@ -85,13 +85,28 @@ All changes are confined to `src/tui.ts`. No new modules.
    change it to `{bold}Shift+PgUp/PgDn{/bold} scroll`. No copy key is advertised
    (it varies by terminal and OS).
 
+4. **Remove the dead wheel-scroll path** — capturing the wheel is gone for good,
+   so the code that turned wheel reports into scroll actions is now dead. Remove
+   it for honesty, keeping the mouse-byte safety net:
+   - In `src/lib/commands.ts`: delete `wheelDirection()`, `SGR_WHEEL_UP`,
+     `SGR_WHEEL_DOWN`, and the `const wheel = wheelDirection(seq); if (wheel …)`
+     branch in `classifyInput`. Narrow the `InputAction` `scroll` member's
+     `unit` from `"page" | "wheel"` to `"page"`.
+   - **Keep** `isMouseSequence()` and the `{ kind: "ignore" }` branch. Its
+     `SGR_MOUSE` regex already matches wheel sequences, so it remains the single
+     catch-all that drops any stray mouse bytes (so they can't leak into the PTY)
+     should mouse reporting ever be on.
+   - In `src/tui.ts`: delete the `WHEEL_LINES` constant and collapse the
+     `action.unit === "page" ? this.pageSize() : WHEEL_LINES` expression in the
+     `"scroll"` case to `this.pageSize()`.
+   - In `src/lib/commands.test.ts`: remove the two wheel-scroll test cases; the
+     `{ kind: "ignore" }` cases stay.
+
 ### Left unchanged
 
-- `classifyInput` in `src/lib/commands.ts` — its wheel/mouse-report branches
-  become dead (those sequences no longer arrive) but remain as harmless
-  defensive code. Its unit tests stay green because the logic is untouched.
-- Keyboard scrolling (`Shift+PgUp` / `Shift+PgDn`) and the custom scrollback
-  renderer (`patchScrollbackRender`, `term.ydisp`) are unaffected.
+- `isMouseSequence()` → `{ kind: "ignore" }` in `classifyInput` (the mouse-byte
+  drop), the page-scroll path, keyboard scrolling (`Shift+PgUp` / `Shift+PgDn`),
+  and the custom scrollback renderer (`patchScrollbackRender`, `term.ydisp`).
 
 ## Testing
 
@@ -103,7 +118,9 @@ full-screen blessed UI). Verification is manual, in a real terminal:
 3. Spin the mouse wheel → nothing scrolls **and** no stray characters reach the
    shell in the active tab.
 4. `Shift+PgUp` / `Shift+PgDn` → history still scrolls.
-5. Existing `classifyInput` unit tests remain green.
+5. `classifyInput` unit tests pass after the wheel-scroll cases are removed
+   (the `{ kind: "ignore" }` cases still pass, proving stray mouse bytes are
+   still dropped).
 
 ## Known caveats
 
