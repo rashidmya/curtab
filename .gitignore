@@ -6,3 +6,6 @@ npm-debug.log*
 coverage/
 *.tsbuildinfo
 .env
+
+# Superpowers design docs / specs (local process artifacts, not tracked)
+docs/superpowers/
