@@ -6,3 +6,6 @@ npm-debug.log*
 coverage/
 *.tsbuildinfo
 .env
+
+# Superpowers design docs are a local process artifact, not part of the project.
+docs/superpowers/

@@ -9,8 +9,10 @@ Run multiple commands at once, each in its own **interactive terminal tab**.
 ![curtab demo](./demo.gif)
 
 Each command runs in a real pseudo-terminal (PTY), so processes stay fully
-interactive — prompts, colors, and keyboard input all work. Switch between tabs
-with the keyboard; inactive tabs keep running and buffering output.
+interactive — prompts, colors, and keyboard input all work. curtab renders each
+tab itself (tmux-style): a tab bar pinned on top, key hints on the bottom, and
+per-tab scrollback you can scroll with the mouse wheel. Inactive tabs keep
+running and buffering output, so switching back is instant.
 
 ```bash
 curtab 'npm run dev' 'npm run api'
@@ -46,21 +48,25 @@ In a `package.json` script **on Windows**, the double quotes must be escaped:
 { "scripts": { "dev": "curtab \"npm run web\" \"npm run api\"" } }
 ```
 
-## Keyboard controls
+## Controls
+
+Tabs are pinned on top; key hints on the bottom. curtab uses a `Ctrl`+`B` leader,
+like a multiplexer. Press `Ctrl`+`B`, then:
 
 | Key | Action |
 | --- | --- |
-| `Alt`+`1`…`9` | Switch to tab |
-| `Alt`+`R` | Restart the active process |
-| `Alt`+`K` | Kill the active process |
-| Mouse wheel / `Shift`+`PageUp`/`PageDown` | Scroll the active tab's history |
-| `Ctrl`+`C` | Quit (kills all processes) |
+| `1`…`9` | Switch to tab N |
+| `n` / `p` | Next / previous tab |
+| `r` | Restart the active process |
+| `k` | Kill the active process |
+| `Ctrl`+`B` | Send a literal `Ctrl`+`B` to the app |
+
+Scroll a tab's history with the **mouse wheel** or `Shift`+`PageUp` /
+`Shift`+`PageDown`. Select with **`Shift`+drag** and copy with **`Ctrl`+`Shift`+`C`**
+(your terminal's native selection — curtab captures the wheel, so hold `Shift` to
+select). `Ctrl`+`C` (without the leader) quits curtab and kills all processes.
 
 Tab status: `●` running · `✓` exited ok · `✕` exited with error · `■` killed.
-
-## Notes
-- In the VS Code terminal, `Shift`+`PageUp`/`PageDown` is captured by the editor;
-  use the mouse wheel to scroll history there.
 
 ## Develop
 
