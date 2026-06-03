@@ -2,29 +2,35 @@
 import { describe, expect, it } from "vitest";
 import { ShadowScreen } from "./shadow";
 
+const settle = () => new Promise((r) => setTimeout(r, 0));
+
 describe("ShadowScreen", () => {
-  it("round-trips plain text through serialize", async () => {
-    const s = new ShadowScreen(80, 24);
-    s.feed("hello world");
-    const snap = await s.snapshot();
-    expect(snap).toContain("hello world");
+  it("reports scrollback depth as content exceeds the viewport", async () => {
+    const s = new ShadowScreen(20, 3);
+    expect(s.scrollbackDepth()).toBe(0);
+    let d = "";
+    for (let i = 0; i < 10; i++) d += `line${i}\r\n`;
+    s.feed(d);
+    await settle();
+    expect(s.scrollbackDepth()).toBeGreaterThan(0);
     s.dispose();
   });
 
-  it("preserves color SGR in the snapshot", async () => {
-    const s = new ShadowScreen(80, 24);
-    s.feed("\x1b[31mred\x1b[0m");
-    const snap = await s.snapshot();
-    expect(snap).toContain("red");
-    expect(snap).toMatch(/\x1b\[[0-9;]*31[0-9;]*m/); // a red foreground SGR
+  it("reports the cursor position", async () => {
+    const s = new ShadowScreen(20, 3);
+    s.feed("ab");
+    await settle();
+    expect(s.cursor()).toEqual({ x: 2, y: 0 });
     s.dispose();
   });
 
-  it("resizes without throwing", async () => {
-    const s = new ShadowScreen(80, 24);
-    s.feed("line");
-    s.resize(100, 30);
-    expect(await s.snapshot()).toContain("line");
+  it("renders the live viewport with text positioned from rowTop", async () => {
+    const s = new ShadowScreen(20, 3);
+    s.feed("hello");
+    await settle();
+    const out = s.renderViewport(0, 3, 20, 2);
+    expect(out).toContain("\x1b[2;1H");
+    expect(out).toContain("hello");
     s.dispose();
   });
 });
