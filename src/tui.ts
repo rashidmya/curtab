@@ -19,6 +19,7 @@ import { Tab } from "./tab";
 
 const WHEEL_LINES = 3; // lines per wheel notch
 const FRAME_MS = 16; // coalesce output bursts to ~60fps
+const RESERVED_ROWS = 2; // tab bar (row 1) + key-hint footer (row N)
 
 export class CurtabApp {
   private tabs: Tab[] = [];
@@ -37,7 +38,7 @@ export class CurtabApp {
   start(): void {
     const { cols, rows } = this.size();
     this.commands.forEach((command, i) => {
-      const tab = new Tab(i, this.names[i]?.trim() || command, command, cols, rows - 2, {
+      const tab = new Tab(i, this.names[i]?.trim() || command, command, cols, rows - RESERVED_ROWS, {
         onData: (t) => this.onTabData(t),
         onExit: () => this.scheduleRender(),
       });
@@ -62,7 +63,7 @@ export class CurtabApp {
   }
 
   private bodyHeight(): number {
-    return Math.max(1, this.size().rows - 2);
+    return Math.max(1, this.size().rows - RESERVED_ROWS);
   }
 
   private write(s: string): void {
@@ -96,7 +97,7 @@ export class CurtabApp {
     const tab = this.tabs[this.active];
     if (!tab) return;
     const { cols, rows } = this.size();
-    const height = rows - 2;
+    const height = rows - RESERVED_ROWS;
     const max = tab.scrollbackDepth();
     if (this.offset > max) this.offset = max;
 
@@ -177,7 +178,8 @@ export class CurtabApp {
   private restartActive(): void {
     const tab = this.tabs[this.active];
     if (!tab) return;
-    tab.restart(this.size().cols, this.bodyHeight());
+    const { cols, rows } = this.size();
+    tab.restart(cols, rows - RESERVED_ROWS);
     this.offset = 0;
     this.unseen = false;
     this.render();
@@ -190,7 +192,7 @@ export class CurtabApp {
 
   private onResize = (): void => {
     const { cols, rows } = this.size();
-    const height = rows - 2;
+    const height = rows - RESERVED_ROWS;
     this.write(setScrollRegion(2, rows - 1));
     for (const tab of this.tabs) tab.resize(cols, height);
     this.render();
