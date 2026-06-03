@@ -153,7 +153,7 @@ const PAGE_DOWN_KEYS = ["\x1b[6;2~", "\x1b[6$", "\x1b[6;3~"];
 const SGR_MOUSE = /^\x1b\[<[0-9;]+[mM]/; // ESC [ < … M/m
 const X10_MOUSE = "\x1b[M"; // legacy ESC [ M b x y
 
-/** A decoded user action, or a passthrough instruction for the TUI. */
+/** A decoded user action, or a forward/ignore instruction for the TUI. */
 export type InputAction =
   | { kind: "quit" }
   | { kind: "restart" }

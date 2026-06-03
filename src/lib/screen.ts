@@ -15,8 +15,8 @@ export interface BarTab {
 }
 
 const ESC = "\x1b";
-export const SAVE_CURSOR = `${ESC}7`;
-export const RESTORE_CURSOR = `${ESC}8`;
+const SAVE_CURSOR = `${ESC}7`;
+const RESTORE_CURSOR = `${ESC}8`;
 export const HIDE_CURSOR = `${ESC}[?25l`;
 export const SHOW_CURSOR = `${ESC}[?25h`;
 const ENTER_ALT = `${ESC}[?1049h`;
