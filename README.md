@@ -8,11 +8,10 @@ Run multiple commands at once, each in its own **interactive terminal tab**.
 
 ![curtab demo](./demo.gif)
 
-Each command runs in a real pseudo-terminal (PTY), so processes stay fully
-interactive — prompts, colors, and keyboard input all work. curtab renders each
-tab itself (tmux-style): a tab bar pinned on top, key hints on the bottom, and
-per-tab scrollback you can scroll with the mouse wheel. Inactive tabs keep
-running and buffering output, so switching back is instant.
+Each command runs in a real pseudo-terminal, so it stays fully interactive —
+colors, prompts, and keyboard input all work. A tab bar sits on top, key hints
+on the bottom, and each tab keeps its own scrollback. Inactive tabs keep
+running, so switching back is instant.
 
 ```bash
 curtab 'npm run dev' 'npm run api'
@@ -50,8 +49,7 @@ In a `package.json` script **on Windows**, the double quotes must be escaped:
 
 ## Controls
 
-Tabs are pinned on top; key hints on the bottom. curtab uses a `Ctrl`+`B` leader,
-like a multiplexer. Press `Ctrl`+`B`, then:
+Press the `Ctrl`+`B` leader, then:
 
 | Key | Action |
 | --- | --- |
@@ -61,10 +59,8 @@ like a multiplexer. Press `Ctrl`+`B`, then:
 | `k` | Kill the active process |
 | `Ctrl`+`B` | Send a literal `Ctrl`+`B` to the app |
 
-Scroll a tab's history with the **mouse wheel** or `Shift`+`PageUp` /
-`Shift`+`PageDown`. Select with **`Shift`+drag** and copy with **`Ctrl`+`Shift`+`C`**
-(your terminal's native selection — curtab captures the wheel, so hold `Shift` to
-select). `Ctrl`+`C` (without the leader) quits curtab and kills all processes.
+Scroll with the **mouse wheel** or `Shift`+`PageUp`/`PageDown`. Select with
+**`Shift`+drag**, copy with **`Ctrl`+`Shift`+`C`**. `Ctrl`+`C` quits.
 
 Tab status: `●` running · `✓` exited ok · `✕` exited with error · `■` killed.
 
