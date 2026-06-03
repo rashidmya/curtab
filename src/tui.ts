@@ -50,7 +50,7 @@ export class CurtabApp {
 
     this.enterRawMode();
     this.write(setScrollRegion(rows));
-    this.write("\x1b[H"); // cursor home, inside the region
+    this.write(clearScreen()); // clean slate so tab 1 doesn't overlap prior screen
     this.paintStatus();
 
     process.stdin.on("data", this.onInput);
