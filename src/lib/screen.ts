@@ -24,9 +24,13 @@ const LEAVE_ALT = `${ESC}[?1049l`;
 const ENABLE_MOUSE = `${ESC}[?1000h${ESC}[?1006h`;
 const DISABLE_MOUSE = `${ESC}[?1006l${ESC}[?1000l`;
 
-/** The footer text — the single source of truth for curtab's key bindings. */
+/**
+ * The footer text — the single source of truth for curtab's key bindings, kept
+ * to ≤80 columns so the quit hint survives on a default-width terminal. `^B`/`^C`
+ * is standard caret notation for Ctrl+B / Ctrl+C; the README spells them out.
+ */
 export const FOOTER_HINTS =
-  "Ctrl+B  1-9 tab · n/p cycle · r restart · k kill     wheel/Shift+PgUp scroll     Shift+drag, Ctrl+Shift+C copy     Ctrl+C quit";
+  "^B 1-9/n/p tab · r restart · k kill · wheel scroll · Shift-drag copy · ^C quit";
 
 /** DECSTBM: restrict scrolling to rows `top..bottom` (1-based, inclusive). */
 export function setScrollRegion(top: number, bottom: number): string {

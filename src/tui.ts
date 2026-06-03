@@ -1,27 +1,33 @@
 /**
- * The passthrough TUI layer.
- *
- * curtab routes bytes between the real terminal and one PTY per tab. The real
- * terminal is the only live emulator; each Tab keeps a headless shadow emulator
- * purely to repaint its exact screen on switch. A scroll region reserves the
- * bottom row for a status bar. This module is intentionally NOT unit tested — it
- * is raw stdin/stdout wiring. All decision logic lives in ./lib/commands and the
- * sequence builders in ./lib/screen.
+ * The curtab TUI. curtab owns the screen tmux-style: it enters the alternate
+ * screen, pins the tab bar (row 1) and key-hint footer (row N), and renders the
+ * active tab from its shadow emulator into rows 2..N-1. One render path serves
+ * both the live view (scroll offset 0) and scrolled-back history. Raw I/O — not
+ * unit tested; decision logic lives in ./lib/commands and the sequence builders
+ * in ./lib/screen.
  */
 import { classifyInput, type InputAction } from "./lib/commands";
 import {
-  clearScreen,
-  paintStatusBar,
+  HIDE_CURSOR,
+  SHOW_CURSOR,
+  paintBars,
   setScrollRegion,
+  setup,
   teardown,
 } from "./lib/screen";
 import { Tab } from "./tab";
 
+const WHEEL_LINES = 3; // lines per wheel notch
+const FRAME_MS = 16; // coalesce output bursts to ~60fps
+
 export class CurtabApp {
   private tabs: Tab[] = [];
   private active = 0;
+  private offset = 0; // lines scrolled above the live bottom (0 = live)
   private leaderPending = false;
   private exiting = false;
+  private renderScheduled = false;
+  private unseen = false; // new output arrived while scrolled
 
   constructor(
     private commands: string[],
@@ -31,27 +37,16 @@ export class CurtabApp {
   start(): void {
     const { cols, rows } = this.size();
     this.commands.forEach((command, i) => {
-      const tab = new Tab(
-        i,
-        this.names[i]?.trim() || command,
-        command,
-        cols,
-        rows - 1, // apps run inside the region; the bottom row is curtab's
-        {
-          onData: (t, data) => this.onTabData(t, data),
-          onExit: () => this.paintStatus(),
-          onAltScreenChange: (t) => {
-            if (t === this.tabs[this.active] && !t.inAltScreen) this.reassert();
-          },
-        },
-      );
+      const tab = new Tab(i, this.names[i]?.trim() || command, command, cols, rows - 2, {
+        onData: (t) => this.onTabData(t),
+        onExit: () => this.scheduleRender(),
+      });
       this.tabs.push(tab);
     });
 
     this.enterRawMode();
-    this.write(setScrollRegion(rows));
-    this.write(clearScreen()); // clean slate so tab 1 doesn't overlap prior screen
-    this.paintStatus();
+    this.write(setup(rows));
+    this.render();
 
     process.stdin.on("data", this.onInput);
     process.stdout.on("resize", this.onResize);
@@ -62,8 +57,12 @@ export class CurtabApp {
   private size(): { cols: number; rows: number } {
     return {
       cols: Math.max(1, process.stdout.columns || 80),
-      rows: Math.max(2, process.stdout.rows || 24),
+      rows: Math.max(3, process.stdout.rows || 24),
     };
+  }
+
+  private bodyHeight(): number {
+    return Math.max(1, this.size().rows - 2);
   }
 
   private write(s: string): void {
@@ -76,44 +75,40 @@ export class CurtabApp {
     process.stdin.setEncoding("utf8");
   }
 
-  /** Active tab's live output is passed straight through to the real terminal. */
-  private onTabData(tab: Tab, data: string): void {
-    if (tab === this.tabs[this.active] && !this.exiting) this.write(data);
+  private onTabData(tab: Tab): void {
+    if (tab !== this.tabs[this.active]) return; // inactive tabs just accumulate
+    if (this.offset > 0) this.unseen = true; // frozen view; flag fresh output
+    this.scheduleRender();
   }
 
-  private paintStatus(): void {
-    const { cols, rows } = this.size();
-    this.write(paintStatusBar(this.tabs, this.active, rows, cols));
+  /** Coalesce output bursts into one repaint. */
+  private scheduleRender(): void {
+    if (this.renderScheduled || this.exiting) return;
+    this.renderScheduled = true;
+    setTimeout(() => {
+      this.renderScheduled = false;
+      this.render();
+    }, FRAME_MS);
   }
 
-  /** Re-establish the scroll region + status bar (after resize / alt-screen exit). */
-  private reassert(): void {
-    const { rows } = this.size();
-    this.write(setScrollRegion(rows));
-    this.paintStatus();
-  }
-
-  /** Clear the screen and repaint the active tab's exact state from its shadow. */
-  private async repaintActive(): Promise<void> {
-    const { rows } = this.size();
+  private render(): void {
+    if (this.exiting) return;
     const tab = this.tabs[this.active];
     if (!tab) return;
-    this.write(setScrollRegion(rows));
-    this.write(clearScreen()); // clear screen + scrollback so tabs don't bleed
-    this.write(await tab.snapshot());
-    this.paintStatus();
-  }
+    const { cols, rows } = this.size();
+    const height = rows - 2;
+    const max = tab.scrollbackDepth();
+    if (this.offset > max) this.offset = max;
 
-  private async switchTo(index: number): Promise<void> {
-    if (index < 0 || index >= this.tabs.length || index === this.active) return;
-    this.active = index;
-    await this.repaintActive();
-  }
-
-  private cycle(delta: number): void {
-    const n = this.tabs.length;
-    if (n === 0) return;
-    void this.switchTo((((this.active + delta) % n) + n) % n);
+    let out = tab.renderViewport(this.offset, height, cols, 2);
+    out += paintBars(this.tabs, this.active, rows, cols, this.offset > 0 && this.unseen);
+    if (this.offset === 0) {
+      const c = tab.cursor();
+      out += `\x1b[${2 + Math.min(height - 1, c.y)};${1 + c.x}H` + SHOW_CURSOR;
+    } else {
+      out += HIDE_CURSOR;
+    }
+    this.write(out);
   }
 
   private onInput = (data: string): void => {
@@ -135,10 +130,13 @@ export class CurtabApp {
         this.killActive();
         return;
       case "switchTab":
-        void this.switchTo(action.index);
+        this.switchTo(action.index);
         return;
       case "cycleTab":
         this.cycle(action.delta);
+        return;
+      case "scroll":
+        this.scroll(action.direction, action.unit);
         return;
       case "ignore":
         return;
@@ -148,29 +146,60 @@ export class CurtabApp {
     }
   }
 
+  private scroll(direction: 1 | -1, unit: "line" | "page"): void {
+    const tab = this.tabs[this.active];
+    if (!tab) return;
+    const amount = unit === "page" ? Math.max(1, this.bodyHeight() - 1) : WHEEL_LINES;
+    const max = tab.scrollbackDepth();
+    let next = this.offset - direction * amount; // up (-1) increases offset
+    if (next < 0) next = 0;
+    if (next > max) next = max;
+    if (next === this.offset) return;
+    this.offset = next;
+    if (this.offset === 0) this.unseen = false;
+    this.render();
+  }
+
+  private switchTo(index: number): void {
+    if (index < 0 || index >= this.tabs.length || index === this.active) return;
+    this.active = index;
+    this.offset = 0;
+    this.unseen = false;
+    this.render();
+  }
+
+  private cycle(delta: number): void {
+    const n = this.tabs.length;
+    if (n === 0) return;
+    this.switchTo((((this.active + delta) % n) + n) % n);
+  }
+
   private restartActive(): void {
     const tab = this.tabs[this.active];
     if (!tab) return;
-    const { cols, rows } = this.size();
-    tab.restart(cols, rows - 1);
-    void this.repaintActive();
+    tab.restart(this.size().cols, this.bodyHeight());
+    this.offset = 0;
+    this.unseen = false;
+    this.render();
   }
 
   private killActive(): void {
     this.tabs[this.active]?.kill();
-    this.paintStatus();
+    this.render();
   }
 
   private onResize = (): void => {
     const { cols, rows } = this.size();
-    for (const tab of this.tabs) tab.resize(cols, rows - 1);
-    void this.repaintActive();
+    const height = rows - 2;
+    this.write(setScrollRegion(2, rows - 1));
+    for (const tab of this.tabs) tab.resize(cols, height);
+    this.render();
   };
 
   private quit(): void {
     if (this.exiting) return;
     this.exiting = true;
-    this.write(teardown()); // reset region, clear screen, show cursor
+    this.write(teardown());
     for (const tab of this.tabs) tab.dispose();
     if (process.stdin.isTTY) {
       try {
