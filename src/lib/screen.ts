@@ -1,7 +1,9 @@
 /**
- * Pure builders for the terminal control sequences curtab writes directly to
- * stdout. No I/O — every function takes state and returns a string, so the exact
- * bytes can be unit tested.
+ * Pure builders for the control sequences curtab writes to own the screen
+ * tmux-style: enter/leave the alternate screen, toggle mouse reporting, reserve
+ * the body region (rows 2..N-1), and paint the tab bar (row 1) + key-hint footer
+ * (row N). No I/O — every function returns a string so the exact bytes are
+ * unit-testable.
  */
 import { tabLabel, type TabStatus } from "./commands";
 
@@ -13,81 +15,74 @@ export interface BarTab {
 }
 
 const ESC = "\x1b";
-export const SAVE_CURSOR = `${ESC}7`; // DECSC
-export const RESTORE_CURSOR = `${ESC}8`; // DECRC
+export const SAVE_CURSOR = `${ESC}7`;
+export const RESTORE_CURSOR = `${ESC}8`;
+export const HIDE_CURSOR = `${ESC}[?25l`;
 export const SHOW_CURSOR = `${ESC}[?25h`;
+const ENTER_ALT = `${ESC}[?1049h`;
+const LEAVE_ALT = `${ESC}[?1049l`;
+const ENABLE_MOUSE = `${ESC}[?1000h${ESC}[?1006h`;
+const DISABLE_MOUSE = `${ESC}[?1006l${ESC}[?1000l`;
 
-/**
- * DECSTBM: limit the scrolling region to rows 1..(rows-1), reserving the bottom
- * row for the status bar. Apps run inside the region and never touch the bar.
- */
-export function setScrollRegion(rows: number): string {
-  const bottom = Math.max(1, rows - 1);
-  return `${ESC}[1;${bottom}r`;
+/** The footer text — the single source of truth for curtab's key bindings. */
+export const FOOTER_HINTS =
+  "Ctrl+B  1-9 tab · n/p cycle · r restart · k kill     wheel/Shift+PgUp scroll     Shift+drag, Ctrl+Shift+C copy     Ctrl+C quit";
+
+/** DECSTBM: restrict scrolling to rows `top..bottom` (1-based, inclusive). */
+export function setScrollRegion(top: number, bottom: number): string {
+  const t = Math.max(1, top);
+  return `${ESC}[${t};${Math.max(t, bottom)}r`;
 }
 
-/** Reset the scrolling region to the full screen. */
-export function resetScrollRegion(): string {
-  return `${ESC}[r`;
-}
-
-/**
- * Clear the screen for a repaint: erase the visible display (`2J`), erase the
- * saved/scrollback lines (`3J`), and home the cursor (`H`). The `3J` is what
- * makes scrollback per-tab — the real terminal has one shared scrollback, so on
- * switch we must evict the previous tab's scrolled-off output before replaying
- * this tab's snapshot, otherwise it bleeds through when the user scrolls up.
- */
-export function clearScreen(): string {
-  return `${ESC}[2J${ESC}[3J${ESC}[H`;
-}
-
-/**
- * Sequence to restore the terminal on exit: reset the scroll region to the full
- * screen, clear the screen + scrollback (like `clear`), and show the cursor.
- * Without this, curtab's last frame and status bar are left on screen and the
- * returning shell prompt collides with the leftover content.
- */
-export function teardown(): string {
-  return resetScrollRegion() + clearScreen() + SHOW_CURSOR;
-}
-
-/**
- * The visible text of the status bar, truncated to `cols`, with the active tab
- * shown in inverse video. SGR codes do not count toward the column budget.
- */
-export function statusBarText(tabs: BarTab[], active: number, cols: number): string {
+/** The tab bar for row 1; `marker` shows a ▼ "new output below" hint. */
+export function tabBar(
+  tabs: BarTab[],
+  active: number,
+  cols: number,
+  marker = false,
+): string {
   let out = "";
   let width = 0;
   for (let i = 0; i < tabs.length; i++) {
     const label = ` ${tabLabel(tabs[i])} `;
     if (width + label.length >= cols) {
       const sliced = label.slice(0, Math.max(0, cols - width));
-      out += i === active ? `${ESC}[7m${sliced}${ESC}[0m` : sliced;
-      return out;
+      return out + (i === active ? `${ESC}[7m${sliced}${ESC}[0m` : sliced);
     }
     out += i === active ? `${ESC}[7m${label}${ESC}[0m` : label;
     width += label.length;
   }
+  if (marker && width + 2 <= cols) out += " ▼";
   return out;
 }
 
-/**
- * Full sequence to paint the status bar on the bottom row without disturbing the
- * app's cursor: save cursor, jump to the bottom row, clear it, write the bar,
- * restore cursor.
- */
-export function paintStatusBar(
+/** Paint the tab bar (row 1) and footer (row N), preserving the app's cursor. */
+export function paintBars(
   tabs: BarTab[],
   active: number,
   rows: number,
   cols: number,
+  marker = false,
 ): string {
+  const footer =
+    FOOTER_HINTS.length > cols ? FOOTER_HINTS.slice(0, cols) : FOOTER_HINTS;
   return (
     SAVE_CURSOR +
-    `${ESC}[${rows};1H` +
-    `${ESC}[2K` +
-    statusBarText(tabs, active, cols) +
+    `${ESC}[1;1H${ESC}[2K` +
+    tabBar(tabs, active, cols, marker) +
+    `${ESC}[${rows};1H${ESC}[2K${ESC}[7m` +
+    footer +
+    `${ESC}[0m` +
     RESTORE_CURSOR
   );
+}
+
+/** Enter curtab's screen: alt buffer, mouse reporting, body region, home body. */
+export function setup(rows: number): string {
+  return ENTER_ALT + ENABLE_MOUSE + setScrollRegion(2, rows - 1) + `${ESC}[2;1H`;
+}
+
+/** Restore the terminal on exit: mouse off, region reset, leave alt, show cursor. */
+export function teardown(): string {
+  return DISABLE_MOUSE + `${ESC}[r` + LEAVE_ALT + SHOW_CURSOR;
 }
