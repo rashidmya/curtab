@@ -9,8 +9,10 @@ Run multiple commands at once, each in its own **interactive terminal tab**.
 ![curtab demo](./demo.gif)
 
 Each command runs in a real pseudo-terminal (PTY), so processes stay fully
-interactive — prompts, colors, and keyboard input all work. Switch between tabs
-with the keyboard; inactive tabs keep running and buffering output.
+interactive — prompts, colors, and keyboard input all work. curtab renders each
+tab itself (tmux-style): a tab bar pinned on top, key hints on the bottom, and
+per-tab scrollback you can scroll with the mouse wheel. Inactive tabs keep
+running and buffering output, so switching back is instant.
 
 ```bash
 curtab 'npm run dev' 'npm run api'
@@ -48,7 +50,8 @@ In a `package.json` script **on Windows**, the double quotes must be escaped:
 
 ## Controls
 
-curtab uses a `Ctrl`+`B` leader, like a multiplexer. Press `Ctrl`+`B`, then:
+Tabs are pinned on top; key hints on the bottom. curtab uses a `Ctrl`+`B` leader,
+like a multiplexer. Press `Ctrl`+`B`, then:
 
 | Key | Action |
 | --- | --- |
@@ -58,14 +61,12 @@ curtab uses a `Ctrl`+`B` leader, like a multiplexer. Press `Ctrl`+`B`, then:
 | `k` | Kill the active process |
 | `Ctrl`+`B` | Send a literal `Ctrl`+`B` to the app |
 
-`Ctrl`+`C` (without the leader) quits curtab and kills all processes.
+Scroll a tab's history with the **mouse wheel** or `Shift`+`PageUp` /
+`Shift`+`PageDown`. Select with **`Shift`+drag** and copy with **`Ctrl`+`Shift`+`C`**
+(your terminal's native selection — curtab captures the wheel, so hold `Shift` to
+select). `Ctrl`+`C` (without the leader) quits curtab and kills all processes.
 
 Tab status: `●` running · `✓` exited ok · `✕` exited with error · `■` killed.
-
-Everything else — mouse, text selection, copy/paste, scroll wheel, scrollback,
-and colors — is handled natively by your terminal. curtab passes each tab's
-output straight through and keeps an off-screen copy only to repaint a tab when
-you switch back to it.
 
 ## Develop
 
