@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex -- input decoding matches terminal control sequences by design */
 /**
  * Pure, side-effect-free logic for curtab.
  *
@@ -146,6 +147,11 @@ export function tabLabel(tab: {
 // active PTY so the running process stays fully interactive.
 const CTRL_C = "\x03";
 const CTRL_B = "\x02"; // leader key — press it, then a command key
+// Shift+PageUp / Shift+PageDown scroll history; accept the common encodings.
+const PAGE_UP_KEYS = ["\x1b[5;2~", "\x1b[5$", "\x1b[5;3~"];
+const PAGE_DOWN_KEYS = ["\x1b[6;2~", "\x1b[6$", "\x1b[6;3~"];
+const SGR_MOUSE = /^\x1b\[<[0-9;]+[mM]/; // ESC [ < … M/m
+const X10_MOUSE = "\x1b[M"; // legacy ESC [ M b x y
 
 /** A decoded user action, or a passthrough instruction for the TUI. */
 export type InputAction =
@@ -154,6 +160,7 @@ export type InputAction =
   | { kind: "kill" }
   | { kind: "switchTab"; index: number } // 0-based tab index
   | { kind: "cycleTab"; delta: 1 | -1 } // relative move, wraps in the TUI
+  | { kind: "scroll"; direction: 1 | -1; unit: "line" | "page" } // -1 = up (older)
   | { kind: "ignore" } // consume the key; do not reach the PTY
   | { kind: "forward"; data?: string }; // send to PTY; data overrides raw seq
 
@@ -179,15 +186,42 @@ function leaderCommand(seq: string): InputAction {
   return { kind: "ignore" }; // unbound key — consume it, like a multiplexer
 }
 
+/** A wheel report -> a one-line scroll action, else null. (64 = up, 65 = down.) */
+function wheelScroll(seq: string): InputAction | null {
+  if (/^\x1b\[<64;/.test(seq)) return { kind: "scroll", direction: -1, unit: "line" };
+  if (/^\x1b\[<65;/.test(seq)) return { kind: "scroll", direction: 1, unit: "line" };
+  if (seq.startsWith(X10_MOUSE) && seq.length >= 4) {
+    const button = seq.charCodeAt(3) - 32;
+    if (button === 64) return { kind: "scroll", direction: -1, unit: "line" };
+    if (button === 65) return { kind: "scroll", direction: 1, unit: "line" };
+  }
+  return null;
+}
+
+/** True for any terminal mouse report (SGR or legacy X10). */
+function isMouseSequence(seq: string): boolean {
+  return SGR_MOUSE.test(seq) || seq.startsWith(X10_MOUSE);
+}
+
+/** Decode an input event when the leader is not armed. */
+function classifyUnprefixed(seq: string): InputAction {
+  if (seq === CTRL_C) return { kind: "quit" };
+  if (PAGE_UP_KEYS.includes(seq)) return { kind: "scroll", direction: -1, unit: "page" };
+  if (PAGE_DOWN_KEYS.includes(seq)) return { kind: "scroll", direction: 1, unit: "page" };
+  const wheel = wheelScroll(seq);
+  if (wheel) return wheel;
+  if (isMouseSequence(seq)) return { kind: "ignore" }; // non-wheel mouse: drop it
+  return { kind: "forward" };
+}
+
 /**
  * Decode one raw input sequence into the action curtab should take and the next
  * leader state. This is the single source of truth for curtab's key bindings;
  * the TUI just holds `leaderPending` and dispatches on the result.
  *
  * Ctrl+B is a leader: it arms `leaderPending`, and the next event is read as a
- * command. A doubled Ctrl+B forwards a literal Ctrl+B. Ctrl+C quits. Everything
- * else is forwarded so the process stays interactive — the real terminal owns
- * mouse, selection, and scrollback.
+ * command. A doubled Ctrl+B forwards a literal Ctrl+B. Otherwise the event is
+ * decoded by `classifyUnprefixed` (quit, scroll, mouse-drop, or forward).
  */
 export function classifyInput(seq: string, leaderPending = false): InputResult {
   if (leaderPending) {
@@ -200,6 +234,5 @@ export function classifyInput(seq: string, leaderPending = false): InputResult {
     // Leader and its command arrived in one buffer (fast typing / paste).
     return classifyInput(seq.slice(1), true);
   }
-  if (seq === CTRL_C) return { action: { kind: "quit" }, leaderPending: false };
-  return { action: { kind: "forward" }, leaderPending: false };
+  return { action: classifyUnprefixed(seq), leaderPending: false };
 }

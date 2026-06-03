@@ -90,3 +90,36 @@ describe("classifyInput — leader state machine", () => {
     expect(classifyInput("\x023").action).toEqual({ kind: "switchTab", index: 2 });
   });
 });
+
+describe("classifyInput — scrolling & mouse", () => {
+  it("scrolls up one line on wheel-up (SGR button 64)", () => {
+    expect(classifyInput("\x1b[<64;10;5M").action).toEqual({
+      kind: "scroll",
+      direction: -1,
+      unit: "line",
+    });
+  });
+  it("scrolls down one line on wheel-down (SGR button 65)", () => {
+    expect(classifyInput("\x1b[<65;10;5M").action).toEqual({
+      kind: "scroll",
+      direction: 1,
+      unit: "line",
+    });
+  });
+  it("pages with Shift+PageUp / Shift+PageDown", () => {
+    expect(classifyInput("\x1b[5;2~").action).toEqual({
+      kind: "scroll",
+      direction: -1,
+      unit: "page",
+    });
+    expect(classifyInput("\x1b[6;2~").action).toEqual({
+      kind: "scroll",
+      direction: 1,
+      unit: "page",
+    });
+  });
+  it("drops non-wheel mouse reports instead of forwarding them", () => {
+    expect(classifyInput("\x1b[<0;10;5M").action).toEqual({ kind: "ignore" });
+    expect(classifyInput("\x1b[<0;10;5m").action).toEqual({ kind: "ignore" });
+  });
+});
