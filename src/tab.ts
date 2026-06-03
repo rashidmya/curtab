@@ -1,25 +1,18 @@
-/* eslint-disable no-control-regex -- alt-screen detection matches terminal control sequences by design */
 /**
  * One curtab tab: a node-pty process plus a headless ShadowScreen that mirrors
- * its output for repaint-on-switch. The Tab tracks run status and whether the
- * app is on the alternate screen (so the TUI can re-assert its status bar when a
- * full-screen app exits).
+ * its output. curtab renders the active tab from the shadow; the Tab tracks run
+ * status and exposes the shadow's scroll/cursor/render to the TUI.
  */
 import * as nodePty from "node-pty";
 import type { IPty } from "node-pty";
 import { buildShellInvocation, type TabStatus } from "./lib/commands";
 import { ShadowScreen } from "./shadow";
 
-const ALT_SCREEN_ENTER = /\x1b\[\?(?:1049|1047|47)h/;
-const ALT_SCREEN_EXIT = /\x1b\[\?(?:1049|1047|47)l/;
-
 export interface TabHooks {
-  /** Called with raw PTY output; the TUI passes it through to stdout if active. */
-  onData: (tab: Tab, data: string) => void;
+  /** Called when the active tab should be repainted (new output). */
+  onData: (tab: Tab) => void;
   /** Called when the PTY exits. */
   onExit: (tab: Tab) => void;
-  /** Called when the app enters or leaves the alternate screen. */
-  onAltScreenChange: (tab: Tab) => void;
 }
 
 export class Tab {
@@ -28,7 +21,6 @@ export class Tab {
   readonly command: string;
   status: TabStatus = "running";
   exitCode?: number;
-  inAltScreen = false;
 
   private pty: IPty;
   private shadow: ShadowScreen;
@@ -63,11 +55,10 @@ export class Tab {
     pty.onData((data) => {
       if (this.pty !== pty) return; // stale PTY from before a restart
       this.shadow.feed(data);
-      this.trackAltScreen(data);
-      this.hooks.onData(this, data);
+      this.hooks.onData(this);
     });
     pty.onExit(({ exitCode }) => {
-      if (this.pty !== pty) return; // stale PTY from before a restart
+      if (this.pty !== pty) return;
       if (this.status !== "killed") {
         this.status = "exited";
         this.exitCode = exitCode;
@@ -77,25 +68,11 @@ export class Tab {
     return pty;
   }
 
-  private trackAltScreen(data: string): void {
-    let changed = false;
-    if (!this.inAltScreen && ALT_SCREEN_ENTER.test(data)) {
-      this.inAltScreen = true;
-      changed = true;
-    }
-    if (this.inAltScreen && ALT_SCREEN_EXIT.test(data)) {
-      this.inAltScreen = false;
-      changed = true;
-    }
-    if (changed) this.hooks.onAltScreenChange(this);
-  }
-
-  /** Forward user input to the process (only while it is running). */
+  /** Forward user input to the process (only while running). */
   write(data: string): void {
     if (this.status === "running") this.pty.write(data);
   }
 
-  /** Resize both the PTY and the shadow emulator to the usable region. */
   resize(cols: number, rows: number): void {
     this.shadow.resize(cols, rows);
     try {
@@ -105,12 +82,18 @@ export class Tab {
     }
   }
 
-  /** Exact screen + scrollback for repaint on switch. */
-  snapshot(): Promise<string> {
-    return this.shadow.snapshot();
+  scrollbackDepth(): number {
+    return this.shadow.scrollbackDepth();
   }
 
-  /** Kill the old process, start a fresh one, and reset the shadow. */
+  cursor(): { x: number; y: number } {
+    return this.shadow.cursor();
+  }
+
+  renderViewport(offset: number, height: number, cols: number, rowTop: number): string {
+    return this.shadow.renderViewport(offset, height, cols, rowTop);
+  }
+
   restart(cols: number, rows: number): void {
     try {
       this.pty.kill();
@@ -121,11 +104,9 @@ export class Tab {
     this.shadow = new ShadowScreen(cols, rows);
     this.status = "running";
     this.exitCode = undefined;
-    this.inAltScreen = false;
     this.pty = this.spawn(cols, rows);
   }
 
-  /** Send SIGTERM and mark the tab killed. */
   kill(): void {
     if (this.status !== "running") return;
     this.status = "killed";
