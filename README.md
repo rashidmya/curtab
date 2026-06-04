@@ -61,7 +61,6 @@ below while it's armed), then:
 | `Ctrl`+`B` | Send a literal `Ctrl`+`B` to the app |
 
 Tab status: `●` running · `✓` exited ok · `✕` exited with error · `■` killed.
-Pass `-c` / `--color` to tint these by status in the tab bar.
 
 ## Develop
 
