@@ -1,6 +1,6 @@
 {
   "name": "curtab",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Run multiple commands at once, each in its own interactive terminal tab.",
   "keywords": [
     "cli",
