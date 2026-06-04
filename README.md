@@ -49,7 +49,8 @@ In a `package.json` script **on Windows**, the double quotes must be escaped:
 
 ## Controls
 
-Press the `Ctrl`+`B` leader, then:
+Press the `Ctrl`+`B` leader (the footer turns into a cheat sheet of the keys
+below while it's armed), then:
 
 | Key | Action |
 | --- | --- |
@@ -59,10 +60,8 @@ Press the `Ctrl`+`B` leader, then:
 | `k` | Kill the active process |
 | `Ctrl`+`B` | Send a literal `Ctrl`+`B` to the app |
 
-Scroll with the **mouse wheel** or `Shift`+`PageUp`/`PageDown`. Select with
-**`Shift`+drag**, copy with **`Ctrl`+`Shift`+`C`**. `Ctrl`+`C` quits.
-
 Tab status: `●` running · `✓` exited ok · `✕` exited with error · `■` killed.
+Pass `-c` / `--color` to tint these by status in the tab bar.
 
 ## Develop
 

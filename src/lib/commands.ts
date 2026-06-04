@@ -23,12 +23,13 @@ Commands containing spaces must be quoted (use double quotes on Windows).
 Options:
   -n, --names 'a,b'   Custom tab names (comma-separated), matched to commands
                        in order. Missing names fall back to the command text.
+  -c, --color          Color-code tab status (running/ok/error/killed).
   -h, --help           Show this help and exit.
   -v, --version        Print the curtab version and exit.
 
 Examples:
   curtab 'npm run dev' 'npm run api'
-  curtab -n 'web, api' 'npm run dev' 'npm run api'
+  curtab -c -n 'web, api' 'npm run dev' 'npm run api'
 `;
 
 /**
@@ -53,6 +54,8 @@ export interface ParsedArgs {
   commands: string[];
   /** Custom tab names from `-n`/`--names`, matched to commands positionally. */
   names: string[];
+  /** `-c`/`--color` was given — tint the tab bar by status. Off by default. */
+  color: boolean;
   /** `-h`/`--help` was given. */
   help: boolean;
   /** `-v`/`--version` was given. */
@@ -70,6 +73,7 @@ export interface ParsedArgs {
 export function parseArgs(argv: string[]): ParsedArgs {
   const commands: string[] = [];
   let names: string[] = [];
+  let color = false;
   let help = false;
   let version = false;
 
@@ -79,6 +83,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       help = true;
     } else if (arg === "--version" || arg === "-v") {
       version = true;
+    } else if (arg === "--color" || arg === "-c") {
+      color = true;
     } else if (arg === "--names" || arg === "-n") {
       names = parseNames(argv[++i] ?? ""); // value is the next token
     } else if (arg.startsWith("--names=")) {
@@ -91,7 +97,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  return { commands, names, help, version };
+  return { commands, names, color, help, version };
 }
 
 export interface ShellInvocation {
@@ -129,6 +135,21 @@ export function statusIcon(status: TabStatus, exitCode?: number): string {
       return "■";
     case "exited":
       return exitCode === 0 ? "✓" : "✕";
+  }
+}
+
+/**
+ * ANSI foreground code for a status glyph: cyan running, green clean exit, red
+ * error exit, bright-black killed. Named colors so they track the terminal theme.
+ */
+export function statusColor(status: TabStatus, exitCode?: number): number {
+  switch (status) {
+    case "running":
+      return 36;
+    case "killed":
+      return 90;
+    case "exited":
+      return exitCode === 0 ? 32 : 31;
   }
 }
 

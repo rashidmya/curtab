@@ -3,6 +3,7 @@ import {
   buildShellInvocation,
   classifyInput,
   parseArgs,
+  statusColor,
   statusIcon,
   tabLabel,
 } from "./commands";
@@ -19,6 +20,11 @@ describe("parseArgs", () => {
     });
     expect(parseArgs(["--help"]).help).toBe(true);
     expect(parseArgs(["-v"]).version).toBe(true);
+  });
+  it("defaults color off and enables it with -c / --color", () => {
+    expect(parseArgs(["a"]).color).toBe(false);
+    expect(parseArgs(["-c", "a"])).toMatchObject({ color: true, commands: ["a"] });
+    expect(parseArgs(["--color", "a"]).color).toBe(true);
   });
 });
 
@@ -44,6 +50,12 @@ describe("status labels", () => {
   });
   it("renders a 1-based label", () => {
     expect(tabLabel({ id: 0, name: "web", status: "running" })).toBe("● 1:web");
+  });
+  it("maps status to an ANSI foreground color code", () => {
+    expect(statusColor("running")).toBe(36); // cyan
+    expect(statusColor("killed")).toBe(90); // bright black / muted
+    expect(statusColor("exited", 0)).toBe(32); // green
+    expect(statusColor("exited", 1)).toBe(31); // red
   });
 });
 
