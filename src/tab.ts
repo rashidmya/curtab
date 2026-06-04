@@ -107,13 +107,7 @@ export class Tab {
   }
 
   restart(cols: number, rows: number): void {
-    if (this.pty) {
-      try {
-        this.pty.kill();
-      } catch {
-        /* already dead */
-      }
-    }
+    this.killPty();
     this.shadow.dispose();
     this.shadow = new ShadowScreen(cols, rows);
     this.status = "running";
@@ -124,22 +118,21 @@ export class Tab {
   kill(): void {
     if (this.status !== "running") return;
     this.status = "killed";
+    this.killPty();
+  }
+
+  dispose(): void {
+    this.killPty();
+    this.shadow.dispose();
+  }
+
+  /** Kill the PTY if one is alive; safe when spawn failed or it already exited. */
+  private killPty(): void {
     if (!this.pty) return;
     try {
       this.pty.kill();
     } catch {
       /* already dead */
     }
-  }
-
-  dispose(): void {
-    if (this.pty) {
-      try {
-        this.pty.kill();
-      } catch {
-        /* already dead */
-      }
-    }
-    this.shadow.dispose();
   }
 }

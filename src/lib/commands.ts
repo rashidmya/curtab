@@ -45,16 +45,10 @@ export function parseCommands(argv: string[]): string[] {
   return argv.map((arg) => arg.trim()).filter((arg) => arg.length > 0);
 }
 
-/** Split a `--names` value ("web, api") into trimmed names; "" yields []. */
-function parseNames(value: string): string[] {
+/** Split a comma-separated flag value ("web, api") into trimmed items; "" yields []. */
+function parseList(value: string): string[] {
   if (value.trim().length === 0) return [];
-  return value.split(",").map((name) => name.trim());
-}
-
-/** Split a `--cwd` value ("web, api") into trimmed dirs; "" yields []. */
-function parseCwds(value: string): string[] {
-  if (value.trim().length === 0) return [];
-  return value.split(",").map((dir) => dir.trim());
+  return value.split(",").map((item) => item.trim());
 }
 
 /** The result of parsing curtab's command-line arguments. */
@@ -98,15 +92,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--color" || arg === "-c") {
       color = true;
     } else if (arg === "--names" || arg === "-n") {
-      names = parseNames(argv[++i] ?? ""); // value is the next token
+      names = parseList(argv[++i] ?? ""); // value is the next token
     } else if (arg.startsWith("--names=")) {
-      names = parseNames(arg.slice("--names=".length));
+      names = parseList(arg.slice("--names=".length));
     } else if (arg.startsWith("-n=")) {
-      names = parseNames(arg.slice("-n=".length));
+      names = parseList(arg.slice("-n=".length));
     } else if (arg === "--cwd") {
-      cwds = parseCwds(argv[++i] ?? ""); // value is the next token
+      cwds = parseList(argv[++i] ?? ""); // value is the next token
     } else if (arg.startsWith("--cwd=")) {
-      cwds = parseCwds(arg.slice("--cwd=".length));
+      cwds = parseList(arg.slice("--cwd=".length));
     } else {
       const command = arg.trim();
       if (command.length > 0) commands.push(command);
