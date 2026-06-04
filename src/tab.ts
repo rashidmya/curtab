@@ -3,6 +3,7 @@
  * its output. curtab renders the active tab from the shadow; the Tab tracks run
  * status and exposes the shadow's scroll/cursor/render to the TUI.
  */
+import { resolve } from "path";
 import * as nodePty from "node-pty";
 import type { IPty } from "node-pty";
 import { buildShellInvocation, type TabStatus } from "./lib/commands";
@@ -29,6 +30,7 @@ export class Tab {
     id: number,
     name: string,
     command: string,
+    private readonly cwd: string | undefined,
     cols: number,
     rows: number,
     private hooks: TabHooks,
@@ -49,7 +51,7 @@ export class Tab {
       name: "xterm-256color",
       cols,
       rows,
-      cwd: process.cwd(),
+      cwd: this.cwd ? resolve(this.cwd) : process.cwd(),
       env: process.env as Record<string, string>,
     });
     pty.onData((data) => {

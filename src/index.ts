@@ -12,7 +12,7 @@ function readVersion(): string {
 }
 
 function main(): void {
-  const { commands, names, color, help, version } = parseArgs(process.argv.slice(2));
+  const { commands, names, cwds, color, help, version } = parseArgs(process.argv.slice(2));
 
   if (help) {
     process.stdout.write(USAGE + "\n");
@@ -29,7 +29,7 @@ function main(): void {
     process.exit(1);
   }
 
-  const app = new CurtabApp(commands, names, color);
+  const app = new CurtabApp(commands, names, cwds, color);
   app.start();
 }
 
