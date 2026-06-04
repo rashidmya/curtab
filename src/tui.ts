@@ -33,6 +33,7 @@ export class CurtabApp {
   constructor(
     private commands: string[],
     private names: string[] = [],
+    private color = false, // tint tab status; opt in with -c
   ) {}
 
   start(): void {
@@ -102,7 +103,15 @@ export class CurtabApp {
     if (this.offset > max) this.offset = max;
 
     let out = tab.renderViewport(this.offset, height, cols, 2);
-    out += paintBars(this.tabs, this.active, rows, cols, this.offset > 0 && this.unseen);
+    out += paintBars(
+      this.tabs,
+      this.active,
+      rows,
+      cols,
+      this.offset > 0 && this.unseen,
+      this.leaderPending,
+      this.color,
+    );
     if (this.offset === 0) {
       const c = tab.cursor();
       out += `\x1b[${2 + Math.min(height - 1, c.y)};${1 + c.x}H` + SHOW_CURSOR;
@@ -114,9 +123,12 @@ export class CurtabApp {
 
   private onInput = (data: string): void => {
     if (this.exiting) return;
+    const wasLeader = this.leaderPending;
     const { action, leaderPending } = classifyInput(data, this.leaderPending);
     this.leaderPending = leaderPending;
     this.dispatch(action, data);
+    // The arming case dispatches "ignore" (no render); repaint when the leader flips.
+    if (this.leaderPending !== wasLeader) this.render();
   };
 
   private dispatch(action: InputAction, raw: string): void {
