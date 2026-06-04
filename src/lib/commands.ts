@@ -23,6 +23,8 @@ Commands containing spaces must be quoted (use double quotes on Windows).
 Options:
   -n, --names 'a,b'   Custom tab names (comma-separated), matched to commands
                        in order. Missing names fall back to the command text.
+      --cwd 'a,b'      Per-command working directories (comma-separated), matched
+                       to commands in order. Missing entries use the launch dir.
   -c, --color          Color-code tab status (running/ok/error/killed).
   -h, --help           Show this help and exit.
   -v, --version        Print the curtab version and exit.
@@ -30,6 +32,7 @@ Options:
 Examples:
   curtab 'npm run dev' 'npm run api'
   curtab -c -n 'web, api' 'npm run dev' 'npm run api'
+  curtab --cwd 'packages/web, packages/api' 'npm run dev' 'npm run start'
 `;
 
 /**
