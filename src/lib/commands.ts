@@ -48,12 +48,20 @@ function parseNames(value: string): string[] {
   return value.split(",").map((name) => name.trim());
 }
 
+/** Split a `--cwd` value ("web, api") into trimmed dirs; "" yields []. */
+function parseCwds(value: string): string[] {
+  if (value.trim().length === 0) return [];
+  return value.split(",").map((dir) => dir.trim());
+}
+
 /** The result of parsing curtab's command-line arguments. */
 export interface ParsedArgs {
   /** Positional commands, one per tab, in order. */
   commands: string[];
   /** Custom tab names from `-n`/`--names`, matched to commands positionally. */
   names: string[];
+  /** Per-command working directories from `--cwd`, matched to commands positionally. */
+  cwds: string[];
   /** `-c`/`--color` was given — tint the tab bar by status. Off by default. */
   color: boolean;
   /** `-h`/`--help` was given. */
@@ -73,6 +81,7 @@ export interface ParsedArgs {
 export function parseArgs(argv: string[]): ParsedArgs {
   const commands: string[] = [];
   let names: string[] = [];
+  let cwds: string[] = [];
   let color = false;
   let help = false;
   let version = false;
@@ -91,13 +100,17 @@ export function parseArgs(argv: string[]): ParsedArgs {
       names = parseNames(arg.slice("--names=".length));
     } else if (arg.startsWith("-n=")) {
       names = parseNames(arg.slice("-n=".length));
+    } else if (arg === "--cwd") {
+      cwds = parseCwds(argv[++i] ?? ""); // value is the next token
+    } else if (arg.startsWith("--cwd=")) {
+      cwds = parseCwds(arg.slice("--cwd=".length));
     } else {
       const command = arg.trim();
       if (command.length > 0) commands.push(command);
     }
   }
 
-  return { commands, names, color, help, version };
+  return { commands, names, cwds, color, help, version };
 }
 
 export interface ShellInvocation {
