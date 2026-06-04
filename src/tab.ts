@@ -23,7 +23,7 @@ export class Tab {
   status: TabStatus = "running";
   exitCode?: number;
 
-  private pty: IPty;
+  private pty: IPty | null;
   private shadow: ShadowScreen;
 
   constructor(
@@ -42,41 +42,51 @@ export class Tab {
     this.pty = this.spawn(cols, rows);
   }
 
-  private spawn(cols: number, rows: number): IPty {
+  private spawn(cols: number, rows: number): IPty | null {
     const { shell, args } = buildShellInvocation(this.command, {
       platform: process.platform,
       env: process.env,
     });
-    const pty = nodePty.spawn(shell, args, {
-      name: "xterm-256color",
-      cols,
-      rows,
-      cwd: this.cwd ? resolve(this.cwd) : process.cwd(),
-      env: process.env as Record<string, string>,
-    });
-    pty.onData((data) => {
-      if (this.pty !== pty) return; // stale PTY from before a restart
-      this.shadow.feed(data);
-      this.hooks.onData(this);
-    });
-    pty.onExit(({ exitCode }) => {
-      if (this.pty !== pty) return;
-      if (this.status !== "killed") {
-        this.status = "exited";
-        this.exitCode = exitCode;
-      }
-      this.hooks.onExit(this);
-    });
-    return pty;
+    const dir = this.cwd ? resolve(this.cwd) : process.cwd();
+    try {
+      const pty = nodePty.spawn(shell, args, {
+        name: "xterm-256color",
+        cols,
+        rows,
+        cwd: dir,
+        env: process.env as Record<string, string>,
+      });
+      pty.onData((data) => {
+        if (this.pty !== pty) return; // stale PTY from before a restart
+        this.shadow.feed(data);
+        this.hooks.onData(this);
+      });
+      pty.onExit(({ exitCode }) => {
+        if (this.pty !== pty) return;
+        if (this.status !== "killed") {
+          this.status = "exited";
+          this.exitCode = exitCode;
+        }
+        this.hooks.onExit(this);
+      });
+      return pty;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.status = "exited";
+      this.exitCode = 1;
+      this.shadow.feed(`curtab: cannot start in ${dir}: ${message}\r\n`);
+      return null;
+    }
   }
 
   /** Forward user input to the process (only while running). */
   write(data: string): void {
-    if (this.status === "running") this.pty.write(data);
+    if (this.status === "running" && this.pty) this.pty.write(data);
   }
 
   resize(cols: number, rows: number): void {
     this.shadow.resize(cols, rows);
+    if (!this.pty) return;
     try {
       this.pty.resize(cols, rows);
     } catch {
@@ -97,10 +107,12 @@ export class Tab {
   }
 
   restart(cols: number, rows: number): void {
-    try {
-      this.pty.kill();
-    } catch {
-      /* already dead */
+    if (this.pty) {
+      try {
+        this.pty.kill();
+      } catch {
+        /* already dead */
+      }
     }
     this.shadow.dispose();
     this.shadow = new ShadowScreen(cols, rows);
@@ -112,6 +124,7 @@ export class Tab {
   kill(): void {
     if (this.status !== "running") return;
     this.status = "killed";
+    if (!this.pty) return;
     try {
       this.pty.kill();
     } catch {
@@ -120,10 +133,12 @@ export class Tab {
   }
 
   dispose(): void {
-    try {
-      this.pty.kill();
-    } catch {
-      /* already dead */
+    if (this.pty) {
+      try {
+        this.pty.kill();
+      } catch {
+        /* already dead */
+      }
     }
     this.shadow.dispose();
   }
