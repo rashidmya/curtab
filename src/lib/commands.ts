@@ -23,6 +23,8 @@ Commands containing spaces must be quoted (use double quotes on Windows).
 Options:
   -n, --names 'a,b'   Custom tab names (comma-separated), matched to commands
                        in order. Missing names fall back to the command text.
+      --cwd 'a,b'      Per-command working directories (comma-separated), matched
+                       to commands in order. Missing entries use the launch dir.
   -c, --color          Color-code tab status (running/ok/error/killed).
   -h, --help           Show this help and exit.
   -v, --version        Print the curtab version and exit.
@@ -30,6 +32,7 @@ Options:
 Examples:
   curtab 'npm run dev' 'npm run api'
   curtab -c -n 'web, api' 'npm run dev' 'npm run api'
+  curtab --cwd 'packages/web, packages/api' 'npm run dev' 'npm run start'
 `;
 
 /**
@@ -42,10 +45,10 @@ export function parseCommands(argv: string[]): string[] {
   return argv.map((arg) => arg.trim()).filter((arg) => arg.length > 0);
 }
 
-/** Split a `--names` value ("web, api") into trimmed names; "" yields []. */
-function parseNames(value: string): string[] {
+/** Split a comma-separated flag value ("web, api") into trimmed items; "" yields []. */
+function parseList(value: string): string[] {
   if (value.trim().length === 0) return [];
-  return value.split(",").map((name) => name.trim());
+  return value.split(",").map((item) => item.trim());
 }
 
 /** The result of parsing curtab's command-line arguments. */
@@ -54,6 +57,8 @@ export interface ParsedArgs {
   commands: string[];
   /** Custom tab names from `-n`/`--names`, matched to commands positionally. */
   names: string[];
+  /** Per-command working directories from `--cwd`, matched to commands positionally. */
+  cwds: string[];
   /** `-c`/`--color` was given — tint the tab bar by status. Off by default. */
   color: boolean;
   /** `-h`/`--help` was given. */
@@ -73,6 +78,7 @@ export interface ParsedArgs {
 export function parseArgs(argv: string[]): ParsedArgs {
   const commands: string[] = [];
   let names: string[] = [];
+  let cwds: string[] = [];
   let color = false;
   let help = false;
   let version = false;
@@ -86,18 +92,22 @@ export function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--color" || arg === "-c") {
       color = true;
     } else if (arg === "--names" || arg === "-n") {
-      names = parseNames(argv[++i] ?? ""); // value is the next token
+      names = parseList(argv[++i] ?? ""); // value is the next token
     } else if (arg.startsWith("--names=")) {
-      names = parseNames(arg.slice("--names=".length));
+      names = parseList(arg.slice("--names=".length));
     } else if (arg.startsWith("-n=")) {
-      names = parseNames(arg.slice("-n=".length));
+      names = parseList(arg.slice("-n=".length));
+    } else if (arg === "--cwd") {
+      cwds = parseList(argv[++i] ?? ""); // value is the next token
+    } else if (arg.startsWith("--cwd=")) {
+      cwds = parseList(arg.slice("--cwd=".length));
     } else {
       const command = arg.trim();
       if (command.length > 0) commands.push(command);
     }
   }
 
-  return { commands, names, color, help, version };
+  return { commands, names, cwds, color, help, version };
 }
 
 export interface ShellInvocation {

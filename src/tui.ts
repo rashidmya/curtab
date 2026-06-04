@@ -33,16 +33,25 @@ export class CurtabApp {
   constructor(
     private commands: string[],
     private names: string[] = [],
+    private cwds: string[] = [],
     private color = false, // tint tab status; opt in with -c
   ) {}
 
   start(): void {
     const { cols, rows } = this.size();
     this.commands.forEach((command, i) => {
-      const tab = new Tab(i, this.names[i]?.trim() || command, command, cols, rows - RESERVED_ROWS, {
-        onData: (t) => this.onTabData(t),
-        onExit: () => this.scheduleRender(),
-      });
+      const tab = new Tab(
+        i,
+        this.names[i]?.trim() || command,
+        command,
+        this.cwds[i]?.trim() || undefined,
+        cols,
+        rows - RESERVED_ROWS,
+        {
+          onData: (t) => this.onTabData(t),
+          onExit: () => this.scheduleRender(),
+        },
+      );
       this.tabs.push(tab);
     });
 

@@ -26,6 +26,15 @@ describe("parseArgs", () => {
     expect(parseArgs(["-c", "a"])).toMatchObject({ color: true, commands: ["a"] });
     expect(parseArgs(["--color", "a"]).color).toBe(true);
   });
+  it("defaults cwds empty and parses --cwd / --cwd= positionally", () => {
+    expect(parseArgs(["a"]).cwds).toEqual([]);
+    expect(parseArgs(["--cwd", "web, api", "a", "b"])).toMatchObject({
+      commands: ["a", "b"],
+      cwds: ["web", "api"],
+    });
+    expect(parseArgs(["--cwd=web", "a"]).cwds).toEqual(["web"]);
+    expect(parseArgs(["--cwd", "", "a"]).cwds).toEqual([]);
+  });
 });
 
 describe("buildShellInvocation", () => {
