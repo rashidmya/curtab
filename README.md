@@ -9,9 +9,7 @@ Run multiple commands at once, each in its own **interactive terminal tab**.
 ![curtab demo](./demo.gif)
 
 Each command runs in a real pseudo-terminal, so it stays fully interactive —
-colors, prompts, and keyboard input all work. A tab bar sits on top, key hints
-on the bottom, and each tab keeps its own scrollback. Inactive tabs keep
-running, so switching back is instant.
+colors, prompts, and keyboard input all work.
 
 ```bash
 curtab 'npm run dev' 'npm run api'
@@ -47,10 +45,19 @@ In a `package.json` script **on Windows**, the double quotes must be escaped:
 { "scripts": { "dev": "curtab \"npm run web\" \"npm run api\"" } }
 ```
 
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-n, --names 'a,b'` | Custom tab names (comma-separated), matched to commands in order. Missing names fall back to the command text. |
+| `--cwd 'a,b'` | Per-command working directories (comma-separated), matched to commands in order. Missing entries use the launch dir. |
+| `-c, --color` | Color-code tab status (running / ok / error / killed). |
+| `-h, --help` | Show help and exit. |
+| `-v, --version` | Print the curtab version and exit. |
+
 ## Controls
 
-Press the `Ctrl`+`B` leader (the footer turns into a cheat sheet of the keys
-below while it's armed), then:
+Press the `Ctrl`+`B` leader, then:
 
 | Key | Action |
 | --- | --- |
@@ -59,8 +66,6 @@ below while it's armed), then:
 | `r` | Restart the active process |
 | `k` | Kill the active process |
 | `Ctrl`+`B` | Send a literal `Ctrl`+`B` to the app |
-
-Tab status: `●` running · `✓` exited ok · `✕` exited with error · `■` killed.
 
 ## Develop
 
